@@ -26,7 +26,8 @@ input,select,textarea{font:inherit;color:var(--ink);background:var(--bg2);border
 input[type=checkbox]{width:auto}
 textarea{min-height:70px;resize:vertical}
 label{display:block;font-size:.78rem;color:var(--muted);margin:12px 0 5px;font-weight:600}
-.top{position:sticky;top:0;z-index:20;background:var(--bg);padding:calc(8px + var(--safe-t)) 12px 6px;border-bottom:1px solid var(--line)}
+.top{position:sticky;top:0;z-index:20;background:var(--bg);padding:calc(26px + var(--safe-t)) 12px 8px;border-bottom:1px solid var(--line)}
+.top::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent),#a855f7,#f472b6)}
 .row{display:flex;align-items:center;gap:6px}
 .grow{flex:1;min-width:0}
 .ib{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-width:38px;height:38px;font-size:1.05rem;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0 8px}
