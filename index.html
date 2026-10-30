@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="eu">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Egutegie">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<title>Egutegie</title>
+<style>
+:root{
+  --bg:#0f1115; --bg2:#151821; --panel:#1b2030; --line:#2a3042; --ink:#e8eaf0; --muted:#8b92a3;
+  --accent:#5eead4; --accent2:#7aa2ff; --danger:#ff6b6b; --warn:#facc15;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:15px}
+body{min-height:100vh;padding-bottom:calc(90px + var(--safe-b))}
+button{font:inherit;color:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 11px;width:100%}
+input[type=checkbox]{width:auto}
+textarea{min-height:70px;resize:vertical}
+label{display:block;font-size:.78rem;color:var(--muted);margin:12px 0 5px;font-weight:600}
+.top{position:sticky;top:0;z-index:20;background:var(--bg);padding:calc(8px + var(--safe-t)) 12px 6px;border-bottom:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:6px}
+.grow{flex:1;min-width:0}
+.ib{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-width:38px;height:38px;font-size:1.05rem;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0 8px}
+.ib.on{border-color:var(--accent);color:var(--accent)}
+.ttl{font-weight:800;font-size:1.05rem;text-align:center;padding:6px 4px;background:none;border:none;width:100%}
+.ttl small{display:block;font-weight:500;color:var(--muted);font-size:.7rem}
+.badge{position:absolute;top:-5px;right:-5px;background:var(--danger);color:#fff;border-radius:999px;font-size:.62rem;font-weight:800;min-width:17px;height:17px;display:none;align-items:center;justify-content:center;padding:0 4px}
+.seg{display:flex;margin-top:8px;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.seg button{flex:1;border:none;background:var(--bg2);padding:8px 2px;font-weight:700;font-size:.82rem;color:var(--muted)}
+.seg button.on{background:var(--accent);color:#06241f}
+#pill{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-top:6px;display:inline-block}
+#pill.ok{color:var(--accent);border-color:rgba(94,234,212,.4)}
+#pill.pend{color:var(--warn);border-color:rgba(250,204,21,.4)}
+#pill.off{color:var(--danger);border-color:rgba(255,107,107,.4)}
+main{padding:10px 12px 0}
+.dow{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:.7rem;color:var(--muted);font-weight:700;margin-bottom:4px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.cell{background:var(--panel);border:1px solid transparent;border-radius:9px;min-height:54px;padding:4px 3px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:.78rem}
+.cell.other{opacity:.38}
+.cell.today .n{background:var(--accent);color:#06241f;border-radius:999px}
+.cell.sel{border-color:var(--accent2)}
+.cell .n{font-weight:700;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+.dots{display:flex;flex-wrap:wrap;gap:2px;justify-content:center}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--c,#888)}
+.dot.ghost{background:none;border:1.5px dashed var(--c,#888)}
+.dot.imp{border-radius:2px;background:none;border:1.5px solid var(--c,#9aa)}
+.dot.ext{border-radius:2px;background:var(--c,#888);opacity:.6}
+.more{font-size:.6rem;color:var(--muted)}
+h3{margin:16px 0 8px;font-size:.85rem;color:var(--muted);text-transform:none;letter-spacing:.02em}
+.dayhead{display:flex;justify-content:space-between;align-items:baseline;margin:14px 0 6px;font-weight:800}
+.dayhead small{color:var(--muted);font-weight:600}
+.dayhead.today{color:var(--accent)}
+.it{display:flex;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--c,#888);border-radius:11px;padding:9px 11px;margin-bottom:6px;width:100%;text-align:left}
+.it .ico{font-size:1.2rem;width:26px;text-align:center}
+.it .tx{flex:1;min-width:0}
+.it .tx b{display:block;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.it .tx small{color:var(--muted);font-size:.74rem}
+.it .tag{font-size:.62rem;font-weight:800;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.it.ghost{border-style:dashed;border-left-style:solid;background:transparent}
+.it.imp{background:rgba(122,162,255,.07)}
+.it.ext{background:rgba(255,255,255,.03);border-left-style:dotted}
+.it.done{opacity:.55}
+.it.done b{text-decoration:line-through}
+.it.skipped{opacity:.4}
+.empty{color:var(--muted);text-align:center;padding:18px 0;font-size:.85rem}
+.fab{position:fixed;right:16px;bottom:calc(18px + var(--safe-b));width:56px;height:56px;border-radius:50%;background:var(--accent);color:#06241f;border:none;font-size:1.9rem;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.5);z-index:25;line-height:1}
+#sheetRoot{position:fixed;inset:0;z-index:40;display:none}
+#sheetRoot.open{display:block}
+.scrim{position:absolute;inset:0;background:rgba(0,0,0,.6)}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-height:92vh;overflow:auto;background:var(--bg);border-top:1px solid var(--line);border-radius:18px 18px 0 0;padding:14px 14px calc(18px + var(--safe-b));-webkit-overflow-scrolling:touch}
+.sheet h2{margin:0 0 4px;font-size:1.05rem}
+.btn{background:var(--accent);color:#06241f;border:none;border-radius:11px;padding:11px 16px;font-weight:800}
+.btn.ghost{background:var(--panel);color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:none;color:var(--danger);border:1px solid rgba(255,107,107,.5)}
+.btn.sm{padding:6px 10px;font-size:.8rem;border-radius:9px}
+.btns{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.btns .grow{flex:1}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font-size:.8rem;font-weight:700}
+.chip.on{background:var(--c,var(--accent));color:#06241f;border-color:transparent}
+.sw{width:30px;height:30px;border-radius:50%;border:3px solid transparent;background:var(--c)}
+.sw.on{border-color:#fff}
+.emo{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:1.2rem}
+.emo.on{border-color:var(--accent);background:rgba(94,234,212,.15)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:8px}
+.card .row b{font-weight:700}
+.note{font-size:.76rem;color:var(--muted);line-height:1.45;margin:8px 0 0}
+.note.warn{color:var(--warn)}
+.stepline{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.stepline input[type=text]{flex:1}
+.mini{width:34px;height:34px;border-radius:9px;background:var(--panel);border:1px solid var(--line);padding:0}
+.sw-row{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(86px + var(--safe-b));background:#272d40;border:1px solid var(--line);padding:9px 14px;border-radius:11px;z-index:60;font-size:.85rem;display:none;max-width:88vw}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="row">
+    <button class="ib" id="bPrev" aria-label="‹">‹</button>
+    <div class="grow"><button class="ttl" id="title"></button></div>
+    <button class="ib" id="bNext" aria-label="›">›</button>
+    <button class="ib" id="bBell" aria-label="Abisuak">🔔<span class="badge" id="bellN"></span></button>
+    <button class="ib" id="bLayers" aria-label="Geruzak">◧</button>
+    <button class="ib" id="bRefresh" aria-label="Freskatu">⟳</button>
+    <button class="ib" id="bSet" aria-label="Ezarpenak">☰</button>
+  </div>
+  <div class="seg" id="seg"></div>
+  <span id="pill"></span>
+</header>
+<main id="main"></main>
+<button class="fab" id="fab" aria-label="Gehitu">+</button>
+<div id="sheetRoot"><div class="scrim" id="scrim"></div><div class="sheet" id="sheet"></div></div>
+<div id="toast"></div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.0/firebase-app.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc }
+  from "https://www.gstatic.com/firebasejs/12.17.0/firebase-firestore.js";
+
+/* ============================================================
+   UI strings. Basque, western Bizkaian.
+   T_OK      = forms Josu confirmed in earlier apps (memory notes), reused verbatim.
+   T_REVIEW  = words with no confirmed dialect form. Written in plain standard Basque
+               on purpose (no invented dialect forms) and listed for Josu's review
+               in testuak_berrikusteko.md (generated from this block).
+   ============================================================ */
+const T_OK = {
+  monthNames: ['Urtarrile', 'Zezeile', 'Martie', 'Aprile', 'Maiatze', 'Bagile', 'Garagarrile', 'Agustue', 'Iraile', 'Urrie', 'Zemendie', 'Abendue'],
+  dayNames: ['astelena', 'martitzena', 'eguztena', 'eguena', 'barikue', 'zapatue', 'domeka'],
+  gehitu: 'Gehitu', gorde: 'Gorde', ezabau: 'Ezabau', editau: 'Editau', ezarpenak: 'Ezarpenak',
+  data: 'Data', izena: 'Izena', gaur: 'Gaur', ziur: 'Ziur zauz?',
+  syncOk: 'Sinkronizeuta', syncNo: 'Ez dau sinkronizeuta', offline: 'Offline',
+  gosaria: 'Gosaria', bazkaria: 'Bazkaria', afaria: 'Afaria'              // as shown in Sutelagun
+};
+// REVIEW START
+const T_REVIEW = {
+  dayInit: ['A', 'M', 'E', 'E', 'B', 'Z', 'D'],                          // initials of the confirmed day names
+  vMonth: 'Hilabetea', vWeek: 'Astea', vDay: 'Eguna', vAgenda: 'Agenda',
+  hutsik: 'Ezer ez', utzi: 'Utzi', itxi: 'Itxi',
+  izenburua: 'Izenburua', mota: 'Mota', motak: 'Motak', motarikGabe: 'Motarik gabe',
+  egunOsoa: 'Egun osoa', hasiera: 'Hasiera', amaiera: 'Amaiera', oharrak: 'Oharrak',
+  abisua: 'Abisua', abisurikEz: 'Abisurik ez',
+  lead10: '10 minutu lehenago', lead30: '30 minutu lehenago', lead60: '1 ordu lehenago', lead120: '2 ordu lehenago',
+  lead1440: '1 egun lehenago', lead2880: '2 egun lehenago',
+  abisuAzalpena: 'Abisu-emailak minutu bat edo bi berandu iritsi daitezke. Ez dira berehalakoak.',
+  izenburuaBeharra: 'Izenburua falta da', dataBeharra: 'Data falta da', izenaBeharra: 'Izena falta da',
+  zikloBeharra: 'Izena eta gutxienez 2 pauso behar dira',
+  googleIrakurtzeSoilik: 'Google Egutegitik ekarria. Irakurtzeko soilik.',
+  kanpokoIrakurtzeSoilik: 'Beste aplikazioetako datuak irakurtzeko soilik dira. Hemendik ez da ezer aldatzen.',
+  egina: 'Egina', saltau: 'Saltau', desegin: 'Desegin', mugitu: 'Mugitu',
+  mugituEgunak: 'Mugitu (egun kopurua, negatiboa lehenago)',
+  ezinMugitu: 'Ezin da egun horretara mugitu',
+  zikloAzalpena: 'Zikloa ez dago asteko egunen menpe. Saltatu edo mugitzean, hurrengo egun guztiak berriro kalkulatzen dira.',
+  azkenAldaketa: 'azken aldaketa',
+  pausoak: 'Pausoak', pausoaGehitu: 'Pausoa', eremuaGehitu: 'Eremua', eremuGehigarriak: 'Eremu gehigarriak',
+  gaurZeinPauso: 'Gaur zein pauso da?',
+  kolorea: 'Kolorea', ikonoa: 'Ikonoa', testua: 'Testua', zenbakia: 'Zenbakia', kutxa: 'Kutxa',
+  zikloak: 'Zikloak', lZikloak: 'Zikloak', lGoogle: 'Google Egutegia', geruzak: 'Geruzak',
+  gaurkoAbisuak: 'Gaurko abisuak', bidalita: 'Bidalita', zain: 'Zain',
+  esportatuIcs: 'Esportatu (.ics)', abisuProba: 'Abisu-proba sortu',
+  probaSortua: 'Proba sortuta. Email bat iritsi beharko litzateke minutu pare batean.',
+  freskatzen: 'Freskatzen…'
+};
+// REVIEW END
+const T = Object.assign({}, T_OK, T_REVIEW);
+
+/* ============================================================
+   Firebase (project YOUR_PROJECT_ID, open rules, no auth)
+   ============================================================ */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.firebasestorage.app",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID88"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = initializeFirestore(fbApp, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
+const C = {
+  ev: collection(db, 'gertaerak'),
+  ty: collection(db, 'motak'),
+  cy: collection(db, 'zikloak'),
+  im: collection(db, 'importatuak')
+};
+const settingsRef = doc(db, 'ezarpenak', 'nagusia');
+
+// Offline, a write promise only resolves once the server acks. Race it so forms never lock up.
+function race(p) {
+  return Promise.race([
+    p.catch(e => { toast('Errorea: ' + (e && e.message || e)); }),
+    new Promise(r => setTimeout(r, 1200))
+  ]);
+}
+const fsSet = (ref, data, opts) => race(setDoc(ref, data, opts || {}));
+const fsDel = ref => race(deleteDoc(ref));
+const fsUpd = (ref, data) => race(updateDoc(ref, data));
+const newId = col => doc(col).id;
+
+/* ============================================================
+   Date helpers (local calendar dates as YYYY-MM-DD strings)
+   ============================================================ */
+const pad = n => String(n).padStart(2, '0');
+const ds = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const pd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addD = (s, n) => { const d = pd(s); d.setDate(d.getDate() + n); return ds(d); };
+const diffD = (a, b) => {
+  const [ay, am, ad] = a.split('-').map(Number), [by, bm, bd] = b.split('-').map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 864e5);
+};
+const wd = s => (pd(s).getDay() + 6) % 7;          // Monday = 0
+const todayS = () => ds(new Date());
+const monthStart = s => s.slice(0, 7) + '-01';
+const addMonths = (s, n) => { const d = pd(monthStart(s)); d.setMonth(d.getMonth() + n); return ds(d); };
+const weekStart = s => addD(s, -wd(s));
+const mins = hhmm => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const longDay = s => T.dayNames[wd(s)] + ', ' + pd(s).getDate() + ' ' + T.monthNames[pd(s).getMonth()].toLowerCase();
+
+// Epoch ms of the moment a reminder fires. All-day events count from 09:00 of that day.
+function reminderAt(dateS, startS, allDay, leadMin) {
+  const [y, m, d] = dateS.split('-').map(Number);
+  const hhmm = (!allDay && startS) ? startS : '09:00';
+  const [h, mi] = hhmm.split(':').map(Number);
+  return new Date(y, m - 1, d, h, mi).getTime() - leadMin * 60000;
+}
+
+/* ============================================================
+   State
+   ============================================================ */
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem('egutegie.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('egutegie.' + k, JSON.stringify(v)); } catch (e) { } }
+};
+const S = {
+  view: LS.get('view', 'month'),
+  cur: todayS(),
+  sel: todayS(),
+  events: [], types: [], cycles: [], imported: [], settings: {},
+  layers: Object.assign({ cycles: true, google: true, ascension: true, sutelagun: true }, LS.get('layers', {})),
+  hiddenTypes: LS.get('hiddenTypes', []),
+  ext: {},
+  meta: { ev: {}, ty: {}, cy: {}, im: {} },
+  online: navigator.onLine
+};
+const PALETTE = ['#ff6b6b', '#fb923c', '#facc15', '#34d399', '#5eead4', '#4da3ff', '#a78bfa', '#f472b6', '#9ca3af'];
+const EMOJIS = ['📚', '🏋️', '📝', '⏰', '🎓', '💼', '🍽️', '🏃', '🧘', '🎮', '🎬', '✈️', '🩺', '🛒', '🎂', '👥', '📞', '💡', '🔧', '⭐', '🏠', '🚗', '🎵', '💰'];
+
+/* ============================================================
+   Firestore listeners + sync status
+   ============================================================ */
+function listen(key, ref, store) {
+  onSnapshot(ref, { includeMetadataChanges: true }, snap => {
+    S.meta[key] = { fromCache: snap.metadata.fromCache, pending: snap.metadata.hasPendingWrites };
+    S[store] = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    render();
+  }, err => { console.warn('listen', key, err); });
+}
+listen('ev', C.ev, 'events');
+listen('ty', C.ty, 'types');
+listen('cy', C.cy, 'cycles');
+listen('im', C.im, 'imported');
+onSnapshot(settingsRef, snap => { S.settings = snap.exists() ? snap.data() : {}; });
+
+function syncText() {
+  const pend = Object.values(S.meta).some(m => m.pending);
+  const cache = Object.values(S.meta).every(m => m.fromCache === undefined || m.fromCache);
+  if (!S.online) return ['off', T.offline + (pend ? ' · ' + T.syncNo : '')];
+  if (pend) return ['pend', T.syncNo];
+  if (cache && Object.values(S.meta).some(m => m.fromCache !== undefined)) return ['pend', T.offline];
+  return ['ok', T.syncOk];
+}
+window.addEventListener('online', () => { S.online = true; refreshExt(true); render(); });
+window.addEventListener('offline', () => { S.online = false; render(); });
+
+/* ============================================================
+   Cycles ("rolling cycles"): a counter that advances one step per calendar day from an
+   anchor (date + step). It is NOT tied to weekdays. Skipping or shifting a day moves
+   the anchor, so every later day recomputes. Past days are read from `historia`.
+   (Idea borrowed from Ascension System's counter-based routine engine, reimplemented.)
+   ============================================================ */
+function cycStep(c, date) {
+  const n = (c.pausoak || []).length;
+  if (!n) return null;
+  const h = (c.historia || {})[date];
+  if (date >= todayS() && c.ainguraData && date >= c.ainguraData) {
+    const p = (((c.ainguraPausoa || 0) + diffD(c.ainguraData, date)) % n + n) % n;
+    return { p, e: (h && h.p === p && h.e === 'egina') ? 'egina' : null };
+  }
+  return h ? { p: h.p, e: h.e } : null;
+}
+async function cycAct(cid, date, act, k) {
+  const c = S.cycles.find(x => x.id === cid); if (!c) return;
+  const st = cycStep(c, date); if (!st) return;
+  const hist = Object.assign({}, c.historia || {});
+  const undo = { ad: c.ainguraData || null, ap: c.ainguraPausoa || 0, date, had: hist[date] || null };
+  let ad = c.ainguraData, ap = c.ainguraPausoa || 0;
+  if (act === 'egina') { hist[date] = { p: st.p, e: 'egina' }; }
+  else if (act === 'desegin-egina') { delete hist[date]; }
+  else if (act === 'saltatuta') { hist[date] = { p: st.p, e: 'saltatuta' }; ad = addD(date, 1); ap = st.p; }
+  else if (act === 'mugitu') {
+    const nd = addD(date, k);
+    if (!k || nd < todayS()) { toast(T.ezinMugitu); return; }
+    ad = nd; ap = st.p;
+  }
+  await fsUpd(doc(db, 'zikloak', cid), { historia: hist, ainguraData: ad, ainguraPausoa: ap, desegin: undo });
+}
+async function cycUndo(cid) {
+  const c = S.cycles.find(x => x.id === cid); if (!c || !c.desegin) return;
+  const u = c.desegin, hist = Object.assign({}, c.historia || {});
+  if (u.had) hist[u.date] = u.had; else delete hist[u.date];
+  await fsUpd(doc(db, 'zikloak', cid), { historia: hist, ainguraData: u.ad, ainguraPausoa: u.ap, desegin: null });
+}
+
+/* ============================================================
+   READ-ONLY ADAPTERS for other apps  (add a new one = add an object to ADAPTERS)
+   Each adapter: { id, izena, kolorea, load() -> { 'YYYY-MM-DD': [ {title, icon, sub, done?, order?} ] } }
+   They only ever GET from the other project's Firestore REST API. Nothing is written back.
+   ============================================================ */
+function fv(v) {                    // decode a Firestore REST value
+  if (!v) return null;
+  if ('stringValue' in v) return v.stringValue;
+  if ('integerValue' in v) return Number(v.integerValue);
+  if ('doubleValue' in v) return v.doubleValue;
+  if ('booleanValue' in v) return v.booleanValue;
+  if ('nullValue' in v) return null;
+  if ('timestampValue' in v) return v.timestampValue;
+  if ('mapValue' in v) { const o = {}; const f = v.mapValue.fields || {}; for (const k in f) o[k] = fv(f[k]); return o; }
+  if ('arrayValue' in v) return (v.arrayValue.values || []).map(fv);
+  return null;
+}
+const fdoc = d => { const o = {}; for (const k in (d.fields || {})) o[k] = fv(d.fields[k]); return o; };
+
+/* ---- ADAPTER 1: Ascension System (project YOUR_ASCENSION_PROJECT_ID, users/{uid}) -----------
+   Josu's account uses the legacy PPL cycle: push,pull,legs,push,pull,legs,rest at S.cycleIndex.
+   It only advances when a Gate is cleared, so future days are a projection ("done every day"). */
+const ASC = { project: 'YOUR_ASCENSION_PROJECT_ID', uid: 'EXAMPLE_UID' };
+const ASC_CYCLE = ['push', 'pull', 'legs', 'push', 'pull', 'legs', 'rest'];
+const ASC_GATES = {
+  push: { n: 'PUSH', i: '🔴', c: '#ff6b6b' }, pull: { n: 'PULL', i: '🔵', c: '#4da3ff' },
+  legs: { n: 'LEGS', i: '🟣', c: '#a855f7' }, rest: { n: 'REST', i: '😴', c: '#8b92a3' }
+};
+const ASC_COLORS = { red: '#ff6b6b', cyan: '#4da3ff', violet: '#a855f7', green: '#34d399', gold: '#facc15', orange: '#fb923c' };
+async function loadAscension() {
+  const fields = ['cycleIndex', 'activeRoutineId', 'customRoutines', 'customTrainingSlot', 'customDayPointer', 'day', 'gateDoneToday', 'gateHalfToday'];
+  const url = `https://firestore.googleapis.com/v1/projects/${ASC.project}/databases/(default)/documents/users/${ASC.uid}?` +
+    fields.map(f => 'mask.fieldPaths=' + f).join('&');
+  const r = await fetch(url); if (!r.ok) throw new Error('ascension ' + r.status);
+  const s = fdoc(await r.json());
+  const today = todayS();
+  const doneToday = s.day === today && !!(s.gateDoneToday || s.gateHalfToday);
+  const pendingRoll = s.day && s.day < today && !!(s.gateDoneToday || s.gateHalfToday); // cleared on an older day, rollover not run yet
+  const out = {};
+  const routine = (s.customRoutines || []).find(x => x.id === s.activeRoutineId);
+  let slot = s.customTrainingSlot || 0, ptr = s.customDayPointer || 0, idx = s.cycleIndex || 0;
+  const adv = () => {
+    if (routine) {
+      const cyc = routine.restCycle || 6, n = Math.max(1, (routine.days || []).length);
+      if (slot >= cyc) slot = 0; else { slot++; ptr = (ptr + 1) % n; }
+    } else idx = (idx + 1) % ASC_CYCLE.length;
+  };
+  if (pendingRoll) adv();
+  for (let k = 0; k < 28; k++) {
+    const date = addD(today, k);
+    let item;
+    if (routine) {
+      const cyc = routine.restCycle || 6;
+      if (slot >= cyc) item = { title: 'REST', icon: ASC_GATES.rest.i, color: ASC_GATES.rest.c };
+      else {
+        const d = (routine.days || [])[ptr % Math.max(1, (routine.days || []).length)] || { name: 'Training' };
+        item = { title: d.name, icon: d.icon || '🏋️', color: ASC_COLORS[d.color] || '#4da3ff' };
+      }
+    } else {
+      const g = ASC_GATES[ASC_CYCLE[idx]];
+      item = { title: g.n, icon: g.i, color: g.c };
+    }
+    item.sub = 'Ascension System'; item.done = k === 0 && doneToday; item.order = -1;
+    (out[date] = out[date] || []).push(item);
+    adv();
+  }
+  return out;
+}
+
+/* ---- ADAPTER 2: Sutelagun (project sutelagun: ezarpenak/dieta + errezetak) --------------
+   Same slot-cursor logic as Sutelagun's own slotZikloEguna(): today shows each slot's cursor,
+   later days project assuming one step per day. */
+async function loadSutelagun() {
+  const base = 'https://firestore.googleapis.com/v1/projects/YOUR_SUTELAGUN_PROJECT_ID/databases/(default)/documents';
+  const r = await fetch(base + '/ezarpenak/dieta'); if (!r.ok) throw new Error('sutelagun ' + r.status);
+  const dieta = fdoc(await r.json());
+  const names = {};
+  let tok = '';
+  do {
+    const rr = await fetch(base + '/errezetak?pageSize=300&mask.fieldPaths=izena' + (tok ? '&pageToken=' + encodeURIComponent(tok) : ''));
+    if (!rr.ok) throw new Error('sutelagun recipes ' + rr.status);
+    const j = await rr.json();
+    (j.documents || []).forEach(d => { names[d.name.split('/').pop()] = (fdoc(d).izena) || '?'; });
+    tok = j.nextPageToken || '';
+  } while (tok);
+  const days = dieta.zikloEgunak || [], n = days.length, out = {};
+  if (!n) return out;
+  const slots = [['gosaria', '🍳', T.gosaria], ['bazkaria', '🍲', T.bazkaria], ['afaria', '🌙', T.afaria]];
+  const today = todayS();
+  for (let k = 0; k < 14; k++) {
+    const date = addD(today, k);
+    slots.forEach(([slot, icon, label], si) => {
+      let idx, biraka;
+      const cur = dieta.aurrerapena && dieta.aurrerapena[slot];
+      if (cur != null) {
+        const raw = k > 0 ? cur + k : cur;
+        const lap = k > 0 ? Math.floor(raw / n) : 0;
+        biraka = ((dieta.aurrerapenaBiraka || {})[slot] || 0) + lap;
+        idx = ((raw % n) + n) % n;
+      } else {
+        if (!dieta.zikloHasieraData) return;
+        idx = (((diffD(dieta.zikloHasieraData, date)) % n) + n) % n; biraka = 0;
+      }
+      const eg = days[idx] || {};
+      const vars = eg[slot + 'Varianteak'];
+      const id = (Array.isArray(vars) && vars.length) ? vars[((biraka % vars.length) + vars.length) % vars.length] : eg[slot + 'Id'];
+      if (!id) return;
+      (out[date] = out[date] || []).push({ title: names[id] || '?', icon, sub: label, order: 1500 + si });
+    });
+  }
+  return out;
+}
+const ADAPTERS = [
+  { id: 'ascension', izena: 'Ascension System', kolorea: '#a855f7', load: loadAscension },
+  { id: 'sutelagun', izena: 'Sutelagun', kolorea: '#fb923c', load: loadSutelagun }
+];
+ADAPTERS.forEach(a => { S.ext[a.id] = LS.get('ext.' + a.id, { ts: 0, items: {} }); });
+let extBusy = false;
+async function refreshExt(force) {
+  if (extBusy || !navigator.onLine) return;
+  extBusy = true;
+  for (const a of ADAPTERS) {
+    const old = S.ext[a.id];
+    if (!force && old.ts && Date.now() - old.ts < 10 * 60000) continue;
+    try { S.ext[a.id] = { ts: Date.now(), items: await a.load() }; LS.set('ext.' + a.id, S.ext[a.id]); }
+    catch (e) { console.warn('adapter', a.id, e); }
+  }
+  extBusy = false; render();
+}
+
+/* ============================================================
+   Items per day (everything the views draw comes from here)
+   ============================================================ */
+const typeOf = id => S.types.find(t => t.id === id);
+function itemsFor(date) {
+  const out = [];
+  S.events.filter(e => e.data === date).forEach(e => {
+    const t = typeOf(e.motaId);
+    if (S.hiddenTypes.includes(e.motaId || '_')) return;
+    out.push({
+      kind: 'own', id: e.id, title: e.izenburua || '', icon: t ? t.ikonoa : '•', color: t ? t.kolorea : '#9ca3af',
+      sub: (e.egunOsoa ? T.egunOsoa : (e.hasiera ? e.hasiera + (e.amaiera ? '–' + e.amaiera : '') : '')) + (t ? (e.egunOsoa || e.hasiera ? ' · ' : '') + t.izena : ''),
+      order: e.egunOsoa ? -3 : (e.hasiera ? mins(e.hasiera) : 1439), bell: e.abisuaNoiz != null, sent: !!e.bidalita
+    });
+  });
+  if (S.layers.cycles) S.cycles.forEach(c => {
+    const st = cycStep(c, date); if (!st) return;
+    const p = (c.pausoak || [])[st.p]; if (!p) return;
+    out.push({
+      kind: 'ghost', cid: c.id, date, title: p.izena, icon: p.ikonoa || '○', color: p.kolorea || '#7aa2ff',
+      sub: c.izena, state: st.e, order: -2
+    });
+  });
+  if (S.layers.google) S.imported.filter(e => e.data === date).forEach(e => {
+    out.push({
+      kind: 'imp', id: e.id, title: e.izenburua || '', icon: '📅', color: '#7aa2ff',
+      sub: e.egunOsoa ? T.egunOsoa : (e.hasiera ? e.hasiera + (e.amaiera ? '–' + e.amaiera : '') : ''),
+      order: e.egunOsoa ? -3 : (e.hasiera ? mins(e.hasiera) : 1439)
+    });
+  });
+  ADAPTERS.forEach(a => {
+    if (!S.layers[a.id]) return;
+    ((S.ext[a.id] || {}).items || {})[date] && S.ext[a.id].items[date].forEach(x => {
+      out.push({ kind: 'ext', src: a.id, title: x.title, icon: x.icon, color: x.color || a.kolorea, sub: x.sub, done: x.done, order: x.order == null ? 1500 : x.order });
+    });
+  });
+  return out.sort((a, b) => a.order - b.order);
+}
+
+/* ============================================================
+   Rendering
+   ============================================================ */
+const $ = id => document.getElementById(id);
+let toastT = null;
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toastT); toastT = setTimeout(() => { t.style.display = 'none'; }, 2600);
+}
+const VIEWS = [['month', 'vMonth'], ['week', 'vWeek'], ['day', 'vDay'], ['agenda', 'vAgenda']];
+
+function tagOf(it) {
+  if (it.kind === 'ghost') return it.state === 'egina' ? '✓' : it.state === 'saltatuta' ? '↷' : '';
+  if (it.kind === 'imp') return 'Google';
+  if (it.kind === 'ext') return it.src === 'ascension' ? 'ASC' : 'SUT';
+  return it.bell ? (it.sent ? '🔔✓' : '🔔') : '';
+}
+function itemHtml(it, date) {
+  const cls = 'it ' + it.kind + (it.state === 'egina' || it.done ? ' done' : '') + (it.state === 'saltatuta' ? ' skipped' : '');
+  const inner = `<span class="ico">${esc(it.icon)}</span><span class="tx"><b>${esc(it.title)}</b><small>${esc(it.sub || '')}</small></span>` +
+    (tagOf(it) ? `<span class="tag">${esc(tagOf(it))}</span>` : '');
+  const st = `style="--c:${esc(it.color)}"`;
+  if (it.kind === 'own') return `<button class="${cls}" ${st} data-act="evt" data-id="${esc(it.id)}">${inner}</button>`;
+  if (it.kind === 'ghost') return `<button class="${cls}" ${st} data-act="ghost" data-cid="${esc(it.cid)}" data-d="${date}">${inner}</button>`;
+  if (it.kind === 'imp') return `<button class="${cls}" ${st} data-act="imp" data-id="${esc(it.id)}">${inner}</button>`;
+  return `<div class="${cls}" ${st}>${inner}</div>`;
+}
+function dayBlock(date, withHead, items) {
+  items = items || itemsFor(date);
+  const t = date === todayS();
+  return (withHead ? `<div class="dayhead ${t ? 'today' : ''}" data-act="goday" data-d="${date}"><span>${esc(longDay(date))}</span><small>${t ? T.gaur : ''}</small></div>` : '') +
+    (items.length ? items.map(i => itemHtml(i, date)).join('') : `<div class="empty">${T.hutsik}</div>`);
+}
+
+function viewMonth() {
+  const first = monthStart(S.cur), start = weekStart(first), curM = pd(first).getMonth(), t = todayS();
+  let h = `<div class="dow">${T.dayInit.map(x => `<span>${x}</span>`).join('')}</div><div class="grid">`;
+  for (let i = 0; i < 42; i++) {
+    const d = addD(start, i), items = itemsFor(d);
+    const dots = items.slice(0, 4).map(x => `<span class="dot ${x.kind === 'own' ? '' : x.kind}" style="--c:${esc(x.color)}"></span>`).join('');
+    h += `<button class="cell ${pd(d).getMonth() !== curM ? 'other' : ''} ${d === t ? 'today' : ''} ${d === S.sel ? 'sel' : ''}" data-act="selday" data-d="${d}">` +
+      `<span class="n">${pd(d).getDate()}</span><span class="dots">${dots}</span>${items.length > 4 ? `<span class="more">+${items.length - 4}</span>` : ''}</button>`;
+  }
+  h += `</div>` + dayBlock(S.sel, true);
+  return h;
+}
+function viewWeek() {
+  const s = weekStart(S.cur); let h = '';
+  for (let i = 0; i < 7; i++) h += dayBlock(addD(s, i), true);
+  return h;
+}
+function viewDay() { return dayBlock(S.cur, true); }
+function viewAgenda() {
+  const from = S.cur; let h = '', any = false;
+  for (let i = 0; i < 60; i++) {
+    const d = addD(from, i), items = itemsFor(d);
+    if (!items.length) continue; any = true; h += dayBlock(d, true, items);
+  }
+  return h || `<div class="empty">${T.hutsik}</div>`;
+}
+function titleOf() {
+  const d = pd(S.cur);
+  if (S.view === 'month') return [T.monthNames[d.getMonth()] + ' ' + d.getFullYear(), ''];
+  if (S.view === 'week') { const a = weekStart(S.cur), b = addD(a, 6); return [pd(a).getDate() + ' – ' + pd(b).getDate() + ' ' + T.monthNames[pd(b).getMonth()], d.getFullYear() + ''] }
+  if (S.view === 'day') return [longDay(S.cur), d.getFullYear() + ''];
+  return [T.vAgenda, longDay(S.cur)];
+}
+function todaysReminders() {
+  const t = todayS();
+  return S.events.filter(e => e.data === t && e.abisuaNoiz != null).sort((a, b) => a.abisuaNoiz - b.abisuaNoiz);
+}
+function render() {
+  const [a, b] = titleOf();
+  $('title').innerHTML = esc(a) + (b ? `<small>${esc(b)}</small>` : '');
+  $('seg').innerHTML = VIEWS.map(([v, k]) => `<button class="${S.view === v ? 'on' : ''}" data-act="view" data-v="${v}">${T[k]}</button>`).join('');
+  const [cls, txt] = syncText(); const p = $('pill'); p.className = cls; p.textContent = txt;
+  const pending = todaysReminders().filter(e => !e.bidalita).length;
+  const bn = $('bellN'); bn.textContent = pending; bn.style.display = pending ? 'flex' : 'none';
+  $('bLayers').classList.toggle('on', S.hiddenTypes.length > 0 || Object.values(S.layers).some(v => !v));
+  const y = window.scrollY;
+  $('main').innerHTML = ({ month: viewMonth, week: viewWeek, day: viewDay, agenda: viewAgenda })[S.view]();
+  window.scrollTo(0, y);
+  document.title = 'Egutegie';
+}
+
+/* ============================================================
+   Sheets
+   ============================================================ */
+let D = null;                                     // draft being edited in the current sheet
+function openSheet(html) { $('sheet').innerHTML = html; $('sheetRoot').classList.add('open'); }
+// After a save, go back to the manager list, unless the user already opened something else.
+const reopen = fn => { if (!$('sheetRoot').classList.contains('open')) fn(); };
+function closeSheet() { $('sheetRoot').classList.remove('open'); $('sheet').innerHTML = ''; D = null; }
+const val = id => { const e = $(id); return e ? e.value : ''; };
+
+/* ---- event editor ---- */
+function extrasHtml(typeId, values) {
+  const t = typeOf(typeId); if (!t || !(t.eremuak || []).length) return '';
+  return t.eremuak.map(f => {
+    const v = (values || {})[f.id];
+    if (f.mota === 'kutxa') return `<label><input type="checkbox" data-fid="${esc(f.id)}" data-fk="kutxa" ${v ? 'checked' : ''}> ${esc(f.izena)}</label>`;
+    return `<label>${esc(f.izena)}</label><input data-fid="${esc(f.id)}" data-fk="${f.mota}" type="${f.mota === 'zenbakia' ? 'number' : 'text'}" inputmode="${f.mota === 'zenbakia' ? 'decimal' : 'text'}" value="${esc(v == null ? '' : v)}">`;
+  }).join('');
+}
+function readExtras() {
+  const o = {};
+  document.querySelectorAll('#ev-extras [data-fid]').forEach(el => {
+    const k = el.dataset.fk;
+    o[el.dataset.fid] = k === 'kutxa' ? el.checked : (k === 'zenbakia' ? (el.value === '' ? null : Number(el.value)) : el.value);
+  });
+  return o;
+}
+const LEADS = [[10, 'lead10'], [30, 'lead30'], [60, 'lead60'], [120, 'lead120'], [1440, 'lead1440'], [2880, 'lead2880']];
+function editEvent(id, date) {
+  const e = id ? S.events.find(x => x.id === id) : null;
+  D = { id: id || newId(C.ev), isNew: !e, prev: e || null, extras: e ? e.eremuak || {} : {} };
+  const v = e || { izenburua: '', data: date || S.sel, hasiera: '', amaiera: '', egunOsoa: false, oharrak: '', motaId: '', abisuMin: null };
+  openSheet(`
+    <h2>${e ? T.editau : T.gehitu}</h2>
+    <label>${T.izenburua}</label><input id="ev-title" value="${esc(v.izenburua)}" autocomplete="off">
+    <label>${T.mota}</label>
+    <select id="ev-type"><option value="">${T.motarikGabe}</option>${S.types.map(t => `<option value="${esc(t.id)}" ${t.id === v.motaId ? 'selected' : ''}>${esc(t.ikonoa)} ${esc(t.izena)}</option>`).join('')}</select>
+    <div id="ev-extras">${extrasHtml(v.motaId, D.extras)}</div>
+    <label>${T.data}</label><input id="ev-date" type="date" value="${esc(v.data)}">
+    <label><input type="checkbox" id="ev-allday" ${v.egunOsoa ? 'checked' : ''}> ${T.egunOsoa}</label>
+    <div class="two" id="ev-times" style="${v.egunOsoa ? 'display:none' : ''}">
+      <div><label>${T.hasiera}</label><input id="ev-start" type="time" value="${esc(v.hasiera || '')}"></div>
+      <div><label>${T.amaiera}</label><input id="ev-end" type="time" value="${esc(v.amaiera || '')}"></div>
+    </div>
+    <label>${T.oharrak}</label><textarea id="ev-notes">${esc(v.oharrak || '')}</textarea>
+    <label>${T.abisua}</label>
+    <select id="ev-lead"><option value="">${T.abisurikEz}</option>${LEADS.map(([m, k]) => `<option value="${m}" ${v.abisuMin === m ? 'selected' : ''}>${T[k]}</option>`).join('')}</select>
+    <p class="note warn">${T.abisuAzalpena}</p>
+    <div class="btns">
+      <button class="btn grow" data-act="evSave">${T.gorde}</button>
+      <button class="btn ghost" data-act="close">${T.utzi}</button>
+      ${e ? `<button class="btn danger" data-act="evDel">${T.ezabau}</button>` : ''}
+    </div>`);
+}
+async function saveEvent() {
+  const title = val('ev-title').trim(); if (!title) { toast(T.izenburuaBeharra); return; }
+  const date = val('ev-date'); if (!date) { toast(T.dataBeharra); return; }
+  const allDay = $('ev-allday').checked, start = allDay ? '' : val('ev-start'), end = allDay ? '' : val('ev-end');
+  const lead = val('ev-lead') === '' ? null : Number(val('ev-lead'));
+  const noiz = lead == null ? null : reminderAt(date, start, allDay, lead);
+  const prev = D.prev;
+  const data = {
+    izenburua: title, data: date, hasiera: start, amaiera: end, egunOsoa: allDay, oharrak: val('ev-notes'),
+    motaId: val('ev-type'), eremuak: readExtras(), abisuMin: lead, abisuaNoiz: noiz,
+    bidalita: !!(prev && prev.bidalita && prev.abisuaNoiz === noiz), sortua: prev ? prev.sortua || Date.now() : Date.now()
+  };
+  const id = D.id; closeSheet();
+  await fsSet(doc(db, 'gertaerak', id), data);
+  S.sel = date; if (S.view === 'day') S.cur = date; render();
+}
+async function deleteEvent() {
+  if (!confirm(T.ziur)) return;
+  const id = D.id; closeSheet(); await fsDel(doc(db, 'gertaerak', id));
+}
+
+/* ---- imported (read-only) ---- */
+function showImported(id) {
+  const e = S.imported.find(x => x.id === id); if (!e) return;
+  openSheet(`<h2>📅 ${esc(e.izenburua)}</h2>
+    <p class="note">${esc(longDay(e.data))} · ${e.egunOsoa ? T.egunOsoa : esc((e.hasiera || '') + (e.amaiera ? '–' + e.amaiera : ''))}</p>
+    ${e.oharrak ? `<p>${esc(e.oharrak)}</p>` : ''}
+    <p class="note">${T.googleIrakurtzeSoilik}</p>
+    <div class="btns"><button class="btn ghost grow" data-act="close">${T.itxi}</button></div>`);
+}
+
+/* ---- cycle ghost actions ---- */
+function ghostSheet(cid, date) {
+  const c = S.cycles.find(x => x.id === cid); if (!c) return;
+  const st = cycStep(c, date); if (!st) return;
+  const p = c.pausoak[st.p];
+  D = { cid, date };
+  openSheet(`<h2>${esc(p.ikonoa || '')} ${esc(p.izena)}</h2>
+    <p class="note">${esc(c.izena)} · ${esc(longDay(date))} · ${st.p + 1}/${c.pausoak.length}${st.e === 'egina' ? ' · ✓' : st.e === 'saltatuta' ? ' · ↷' : ''}</p>
+    <div class="btns">
+      ${st.e === 'egina'
+        ? `<button class="btn ghost grow" data-act="cyc" data-a="desegin-egina">${T.desegin}</button>`
+        : st.e === 'saltatuta' ? '' : `<button class="btn grow" data-act="cyc" data-a="egina">✓ ${T.egina}</button>
+      <button class="btn ghost grow" data-act="cyc" data-a="saltatuta">↷ ${T.saltau}</button>`}
+    </div>
+    ${st.e ? '' : `<label>${T.mugituEgunak}</label>
+    <div class="row"><input id="cy-shift" type="number" value="1" style="max-width:110px"><button class="btn ghost" data-act="cyc" data-a="mugitu">${T.mugitu}</button></div>
+    <p class="note">${T.zikloAzalpena}</p>`}
+    <div class="btns">
+      ${c.desegin ? `<button class="btn ghost sm" data-act="cycUndo">${T.desegin}: ${T.azkenAldaketa}</button>` : ''}
+      <button class="btn ghost sm" data-act="close">${T.itxi}</button>
+    </div>`);
+}
+
+/* ---- layers + type filter ---- */
+function layersSheet() {
+  const L = [['cycles', T.lZikloak, '#7aa2ff'], ['google', T.lGoogle, '#7aa2ff'], ...ADAPTERS.map(a => [a.id, a.izena, a.kolorea])];
+  const age = a => { const t = (S.ext[a] || {}).ts; if (!t) return '—'; const x = new Date(t); return ds(x).slice(5) + ' ' + pad(x.getHours()) + ':' + pad(x.getMinutes()); };
+  openSheet(`<h2>${T.geruzak}</h2>
+    <div class="chips" style="margin-top:10px">${L.map(([k, n, c]) => `<button class="chip ${S.layers[k] ? 'on' : ''}" style="--c:${c}" data-act="layer" data-k="${k}">${esc(n)}</button>`).join('')}</div>
+    <p class="note">${ADAPTERS.map(a => `${esc(a.izena)}: ${esc(age(a.id))}`).join(' · ')}<br>${T.kanpokoIrakurtzeSoilik}</p>
+    <h3>${T.motak}</h3>
+    <div class="chips">${S.types.concat([{ id: '_', izena: T.motarikGabe, kolorea: '#9ca3af', ikonoa: '•' }]).map(t => `<button class="chip ${S.hiddenTypes.includes(t.id) ? '' : 'on'}" style="--c:${esc(t.kolorea)}" data-act="typeFilter" data-k="${esc(t.id)}">${esc(t.ikonoa)} ${esc(t.izena)}</button>`).join('')}</div>
+    <div class="btns"><button class="btn ghost grow" data-act="close">${T.itxi}</button></div>`);
+}
+
+/* ---- reminders bell ---- */
+function bellSheet() {
+  const r = todaysReminders();
+  openSheet(`<h2>🔔 ${T.gaurkoAbisuak}</h2>
+    ${r.length ? r.map(e => `<button class="it own" style="--c:${esc((typeOf(e.motaId) || {}).kolorea || '#9ca3af')}" data-act="evt" data-id="${esc(e.id)}"><span class="ico">${e.bidalita ? '✓' : '⏳'}</span><span class="tx"><b>${esc(e.izenburua)}</b><small>${new Date(e.abisuaNoiz).toTimeString().slice(0, 5)} · ${e.bidalita ? T.bidalita : T.zain}</small></span></button>`).join('') : `<div class="empty">${T.hutsik}</div>`}
+    <p class="note warn">${T.abisuAzalpena}</p>
+    <div class="btns"><button class="btn ghost grow" data-act="close">${T.itxi}</button></div>`);
+}
+async function testReminder() {
+  const now = new Date(Date.now() + 2 * 60000);
+  const id = newId(C.ev), date = ds(now), start = pad(now.getHours()) + ':' + pad(now.getMinutes());
+  await fsSet(doc(db, 'gertaerak', id), {
+    izenburua: 'Proba / Test', data: date, hasiera: start, amaiera: '', egunOsoa: false, oharrak: 'Egutegie reminder test',
+    motaId: '', eremuak: {}, abisuMin: 1, abisuaNoiz: reminderAt(date, start, false, 1), bidalita: false, sortua: Date.now()
+  });
+  closeSheet(); toast(T.probaSortua);
+}
+
+/* ---- settings ---- */
+function settingsSheet() {
+  openSheet(`<h2>${T.ezarpenak}</h2>
+    <div class="btns" style="flex-direction:column">
+      <button class="btn ghost" data-act="typesList">${T.motak}</button>
+      <button class="btn ghost" data-act="cyclesList">${T.zikloak}</button>
+      <button class="btn ghost" data-act="ics">${T.esportatuIcs}</button>
+      <button class="btn ghost" data-act="testRem">${T.abisuProba}</button>
+    </div>
+    <p class="note">${T.abisuAzalpena}</p>
+    <div class="btns"><button class="btn ghost grow" data-act="close">${T.itxi}</button></div>`);
+}
+
+/* ---- types manager ---- */
+function typesList() {
+  openSheet(`<h2>${T.motak}</h2>
+    ${S.types.map(t => `<div class="card row"><span style="font-size:1.3rem">${esc(t.ikonoa)}</span><b class="grow" style="color:${esc(t.kolorea)}">${esc(t.izena)}</b><button class="btn ghost sm" data-act="typeEdit" data-id="${esc(t.id)}">${T.editau}</button></div>`).join('') || `<div class="empty">${T.hutsik}</div>`}
+    <div class="btns"><button class="btn grow" data-act="typeEdit" data-id="">${T.gehitu}</button><button class="btn ghost" data-act="settings">${T.itxi}</button></div>`);
+}
+function typeDraftCapture() {
+  if (!D || D.kind !== 'type') return;
+  D.izena = val('ty-name');
+  D.eremuak = [...document.querySelectorAll('.tf')].map(el => ({ id: el.dataset.id, izena: el.querySelector('.tf-n').value, mota: el.querySelector('.tf-k').value }));
+}
+function typeForm() {
+  openSheet(`<h2>${D.isNew ? T.gehitu : T.editau}</h2>
+    <label>${T.izena}</label><input id="ty-name" value="${esc(D.izena)}" autocomplete="off">
+    <label>${T.kolorea}</label>
+    <div class="sw-row">${PALETTE.map(c => `<button class="sw ${D.kolorea === c ? 'on' : ''}" style="--c:${c}" data-act="tyCol" data-v="${c}" aria-label="${c}"></button>`).join('')}</div>
+    <label>${T.ikonoa}</label>
+    <div class="sw-row">${EMOJIS.map(e => `<button class="emo ${D.ikonoa === e ? 'on' : ''}" data-act="tyEmo" data-v="${e}">${e}</button>`).join('')}</div>
+    <label>${T.eremuGehigarriak}</label>
+    ${D.eremuak.map(f => `<div class="stepline tf" data-id="${esc(f.id)}"><input class="tf-n" type="text" value="${esc(f.izena)}" placeholder="${T.izena}">
+      <select class="tf-k" style="max-width:120px"><option value="testua" ${f.mota === 'testua' ? 'selected' : ''}>${T.testua}</option><option value="zenbakia" ${f.mota === 'zenbakia' ? 'selected' : ''}>${T.zenbakia}</option><option value="kutxa" ${f.mota === 'kutxa' ? 'selected' : ''}>${T.kutxa}</option></select>
+      <button class="mini" data-act="tfDel" data-id="${esc(f.id)}">✕</button></div>`).join('')}
+    <button class="btn ghost sm" data-act="tfAdd">+ ${T.eremuaGehitu}</button>
+    <div class="btns">
+      <button class="btn grow" data-act="tySave">${T.gorde}</button>
+      <button class="btn ghost" data-act="typesList">${T.utzi}</button>
+      ${D.isNew ? '' : `<button class="btn danger" data-act="tyDel">${T.ezabau}</button>`}
+    </div>`);
+}
+function typeEdit(id) {
+  const t = id ? typeOf(id) : null;
+  D = { kind: 'type', id: id || newId(C.ty), isNew: !t, izena: t ? t.izena : '', kolorea: t ? t.kolorea : PALETTE[4], ikonoa: t ? t.ikonoa : EMOJIS[0], eremuak: t ? JSON.parse(JSON.stringify(t.eremuak || [])) : [] };
+  typeForm();
+}
+
+/* ---- cycles manager ---- */
+function cyclesList() {
+  openSheet(`<h2>${T.zikloak}</h2>
+    ${S.cycles.map(c => `<div class="card"><div class="row"><b class="grow">${esc(c.izena)}</b><button class="btn ghost sm" data-act="cycEdit" data-id="${esc(c.id)}">${T.editau}</button></div>
+      <div class="note">${(c.pausoak || []).map(p => esc((p.ikonoa || '') + ' ' + p.izena)).join(' → ')}</div></div>`).join('') || `<div class="empty">${T.hutsik}</div>`}
+    <div class="btns"><button class="btn grow" data-act="cycEdit" data-id="">${T.gehitu}</button><button class="btn ghost" data-act="settings">${T.itxi}</button></div>`);
+}
+function cycDraftCapture() {
+  if (!D || D.kind !== 'cycle') return;
+  D.izena = val('cy-name');
+  D.pausoak = [...document.querySelectorAll('.cs')].map((el, i) => ({ ikonoa: el.querySelector('.cs-i').value, izena: el.querySelector('.cs-n').value, kolorea: D.pausoak[i].kolorea }));
+  const s = $('cy-start'); if (s) D.start = Number(s.value);
+}
+function cycleForm() {
+  openSheet(`<h2>${D.isNew ? T.gehitu : T.editau}</h2>
+    <label>${T.izena}</label><input id="cy-name" value="${esc(D.izena)}" autocomplete="off">
+    <label>${T.pausoak}</label>
+    ${D.pausoak.map((p, i) => `<div class="stepline cs"><input class="cs-i" type="text" value="${esc(p.ikonoa || '')}" style="width:52px;text-align:center" maxlength="4">
+      <input class="cs-n" type="text" value="${esc(p.izena)}" placeholder="${T.izena}">
+      <button class="sw" style="--c:${esc(p.kolorea)};width:28px;height:28px;flex:none" data-act="csCol" data-i="${i}" aria-label="color"></button>
+      <button class="mini" data-act="csUp" data-i="${i}">↑</button><button class="mini" data-act="csDn" data-i="${i}">↓</button><button class="mini" data-act="csDel" data-i="${i}">✕</button></div>`).join('')}
+    <button class="btn ghost sm" data-act="csAdd">+ ${T.pausoaGehitu}</button>
+    <label>${T.gaurZeinPauso}</label>
+    <select id="cy-start">${D.pausoak.map((p, i) => `<option value="${i}" ${D.start === i ? 'selected' : ''}>${i + 1}. ${esc(p.izena)}</option>`).join('')}</select>
+    <p class="note">${T.zikloAzalpena}</p>
+    <div class="btns">
+      <button class="btn grow" data-act="cySave">${T.gorde}</button>
+      <button class="btn ghost" data-act="cyclesList">${T.utzi}</button>
+      ${D.isNew ? '' : `<button class="btn danger" data-act="cyDel">${T.ezabau}</button>`}
+    </div>`);
+}
+function cycEdit(id) {
+  const c = id ? S.cycles.find(x => x.id === id) : null;
+  let start = 0;
+  if (c) { const st = cycStep(c, todayS()); start = st ? st.p : (c.ainguraPausoa || 0); }
+  D = {
+    kind: 'cycle', id: id || newId(C.cy), isNew: !c, izena: c ? c.izena : '', start,
+    pausoak: c ? JSON.parse(JSON.stringify(c.pausoak)) : [{ izena: '', ikonoa: '', kolorea: PALETTE[0] }, { izena: '', ikonoa: '', kolorea: PALETTE[5] }], origStart: start
+  };
+  cycleForm();
+}
+async function saveCycle() {
+  cycDraftCapture();
+  const steps = D.pausoak.filter(p => p.izena.trim());
+  if (!D.izena.trim() || steps.length < 2) { toast(T.zikloBeharra); return; }
+  const c = S.cycles.find(x => x.id === D.id);
+  const start = Math.min(D.start || 0, steps.length - 1);
+  const data = { izena: D.izena.trim(), pausoak: steps.map(p => ({ izena: p.izena.trim(), ikonoa: p.ikonoa.trim(), kolorea: p.kolorea })) };
+  if (!c) Object.assign(data, { ainguraData: todayS(), ainguraPausoa: start, historia: {}, desegin: null });
+  else if (start !== D.origStart) Object.assign(data, { ainguraData: todayS(), ainguraPausoa: start });
+  const id = D.id; closeSheet();
+  await fsSet(doc(db, 'zikloak', id), data, { merge: true });
+  cyclesListLater();
+}
+const cyclesListLater = () => reopen(cyclesList);
+
+/* ============================================================
+   .ics export (own events only; floating local times)
+   ============================================================ */
+function icsEsc(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;'); }
+function fold(line) { const out = []; while (line.length > 72) { out.push(line.slice(0, 72)); line = ' ' + line.slice(72); } out.push(line); return out.join('\r\n'); }
+function buildIcs() {
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Egutegie//EU', 'CALSCALE:GREGORIAN', 'X-WR-CALNAME:Egutegie'];
+  const stamp = new Date().toISOString().replace(/[-:]|\.\d+/g, '');
+  const dt = (d, h) => d.replace(/-/g, '') + (h ? 'T' + h.replace(':', '') + '00' : '');
+  S.events.slice().sort((a, b) => (a.data + (a.hasiera || '')).localeCompare(b.data + (b.hasiera || ''))).forEach(e => {
+    const t = typeOf(e.motaId);
+    L.push('BEGIN:VEVENT', 'UID:' + e.id + '@egutegie', 'DTSTAMP:' + stamp, 'SUMMARY:' + icsEsc(e.izenburua));
+    if (e.egunOsoa || !e.hasiera) { L.push('DTSTART;VALUE=DATE:' + dt(e.data), 'DTEND;VALUE=DATE:' + dt(addD(e.data, 1))); }
+    else {
+      L.push('DTSTART:' + dt(e.data, e.hasiera));
+      L.push('DTEND:' + dt(e.data, e.amaiera || e.hasiera));
+    }
+    if (e.oharrak) L.push('DESCRIPTION:' + icsEsc(e.oharrak));
+    if (t) L.push('CATEGORIES:' + icsEsc(t.izena));
+    if (e.abisuMin != null) L.push('BEGIN:VALARM', 'TRIGGER:-PT' + e.abisuMin + 'M', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEsc(e.izenburua), 'END:VALARM');
+    L.push('END:VEVENT');
+  });
+  L.push('END:VCALENDAR');
+  return L.map(fold).join('\r\n') + '\r\n';
+}
+function exportIcs() {
+  const blob = new Blob([buildIcs()], { type: 'text/calendar;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'egutegie.ics';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(S.events.length + ' ✓');
+}
+window.__egutegie = { buildIcs, S, cycStep, itemsFor };       // handle for the CDP tests
+
+/* ============================================================
+   Event wiring
+   ============================================================ */
+const ACT = {
+  view: d => { S.view = d.v; LS.set('view', S.view); if (S.view === 'agenda' || S.view === 'day') S.cur = S.sel; render(); },
+  selday: d => { S.sel = d.d; S.cur = d.d; render(); },
+  goday: d => { S.sel = d.d; S.cur = d.d; S.view = 'day'; LS.set('view', 'day'); render(); },
+  evt: d => editEvent(d.id),
+  imp: d => showImported(d.id),
+  ghost: d => ghostSheet(d.cid, d.d),
+  close: closeSheet,
+  evSave: saveEvent, evDel: deleteEvent,
+  cyc: async d => {
+    const { cid, date } = D, k = d.a === 'mugitu' ? Number(val('cy-shift')) : 0;
+    closeSheet(); await cycAct(cid, date, d.a, k);
+  },
+  cycUndo: async () => { const { cid } = D; closeSheet(); await cycUndo(cid); },
+  layer: d => { S.layers[d.k] = !S.layers[d.k]; LS.set('layers', S.layers); layersSheet(); render(); },
+  typeFilter: d => {
+    const i = S.hiddenTypes.indexOf(d.k); if (i >= 0) S.hiddenTypes.splice(i, 1); else S.hiddenTypes.push(d.k);
+    LS.set('hiddenTypes', S.hiddenTypes); layersSheet(); render();
+  },
+  settings: settingsSheet, typesList, cyclesList,
+  ics: exportIcs, testRem: testReminder,
+  typeEdit: d => typeEdit(d.id),
+  tyCol: d => { typeDraftCapture(); D.kolorea = d.v; typeForm(); },
+  tyEmo: d => { typeDraftCapture(); D.ikonoa = d.v; typeForm(); },
+  tfAdd: () => { typeDraftCapture(); D.eremuak.push({ id: 'f' + Date.now().toString(36), izena: '', mota: 'testua' }); typeForm(); },
+  tfDel: d => { typeDraftCapture(); D.eremuak = D.eremuak.filter(f => f.id !== d.id); typeForm(); },
+  tySave: async () => {
+    typeDraftCapture(); if (!D.izena.trim()) { toast(T.izenaBeharra); return; }
+    const data = { izena: D.izena.trim(), kolorea: D.kolorea, ikonoa: D.ikonoa, eremuak: D.eremuak.filter(f => f.izena.trim()).map(f => ({ id: f.id, izena: f.izena.trim(), mota: f.mota })) };
+    const id = D.id; closeSheet(); await fsSet(doc(db, 'motak', id), data); reopen(typesList);
+  },
+  tyDel: async () => { if (!confirm(T.ziur)) return; const id = D.id; closeSheet(); await fsDel(doc(db, 'motak', id)); reopen(typesList); },
+  cycEdit: d => cycEdit(d.id),
+  csAdd: () => { cycDraftCapture(); D.pausoak.push({ izena: '', ikonoa: '', kolorea: PALETTE[D.pausoak.length % PALETTE.length] }); cycleForm(); },
+  csDel: d => { cycDraftCapture(); if (D.pausoak.length > 2) D.pausoak.splice(+d.i, 1); D.start = Math.min(D.start, D.pausoak.length - 1); cycleForm(); },
+  csUp: d => { cycDraftCapture(); const i = +d.i; if (i > 0) { [D.pausoak[i - 1], D.pausoak[i]] = [D.pausoak[i], D.pausoak[i - 1]]; } cycleForm(); },
+  csDn: d => { cycDraftCapture(); const i = +d.i; if (i < D.pausoak.length - 1) { [D.pausoak[i + 1], D.pausoak[i]] = [D.pausoak[i], D.pausoak[i + 1]]; } cycleForm(); },
+  csCol: d => { cycDraftCapture(); const p = D.pausoak[+d.i]; p.kolorea = PALETTE[(PALETTE.indexOf(p.kolorea) + 1) % PALETTE.length]; cycleForm(); },
+  cySave: saveCycle,
+  cyDel: async () => { if (!confirm(T.ziur)) return; const id = D.id; closeSheet(); await fsDel(doc(db, 'zikloak', id)); cyclesListLater(); }
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const f = ACT[el.dataset.act]; if (f) f(el.dataset);
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'ev-type') { D.extras = Object.assign(D.extras || {}, readExtras()); $('ev-extras').innerHTML = extrasHtml(e.target.value, D.extras); }
+  if (e.target.id === 'ev-allday') $('ev-times').style.display = e.target.checked ? 'none' : '';
+});
+$('scrim').addEventListener('click', closeSheet);
+$('fab').addEventListener('click', () => editEvent(null, S.view === 'month' || S.view === 'day' || S.view === 'week' ? S.sel : todayS()));
+$('bPrev').addEventListener('click', () => nav(-1));
+$('bNext').addEventListener('click', () => nav(1));
+function nav(n) {
+  if (S.view === 'month') { S.cur = addMonths(S.cur, n); S.sel = S.cur.slice(0, 7) === todayS().slice(0, 7) ? todayS() : monthStart(S.cur); }
+  else if (S.view === 'week') { S.cur = addD(S.cur, 7 * n); S.sel = S.cur; }
+  else if (S.view === 'day') { S.cur = addD(S.cur, n); S.sel = S.cur; }
+  else { S.cur = addD(S.cur, 14 * n); S.sel = S.cur; }
+  render();
+}
+$('title').addEventListener('click', () => { S.cur = todayS(); S.sel = todayS(); render(); });
+$('bBell').addEventListener('click', bellSheet);
+$('bLayers').addEventListener('click', layersSheet);
+$('bSet').addEventListener('click', settingsSheet);
+$('bRefresh').addEventListener('click', async () => {
+  toast(T.freskatzen);
+  try { const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.update())); } catch (e) { }
+  await refreshExt(true);
+  setTimeout(() => location.reload(), 400);
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { S.online = navigator.onLine; refreshExt(); render(); } });
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => { });
+render();
+refreshExt();
+</script>
+</body>
+</html>
