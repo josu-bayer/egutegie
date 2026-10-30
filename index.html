@@ -168,7 +168,11 @@ const T_REVIEW = {
   gaurkoAbisuak: 'Gaurko abisuak', bidalita: 'Bidalita', zain: 'Zain',
   esportatuIcs: 'Esportatu (.ics)', abisuProba: 'Abisu-proba sortu',
   probaSortua: 'Proba sortuta. Email bat iritsi beharko litzateke minutu pare batean.',
-  freskatzen: 'Freskatzen…'
+  freskatzen: 'Freskatzen…',
+  errepikapena: 'Errepikapena', errEz: 'Ez da errepikatzen', errEgunero: 'Egunero', errAstero: 'Astero', errHilero: 'Hilero', errUrtero: 'Urtero',
+  errTartea: 'Tartea (zenbatero)', errArte: 'Arte (hautazkoa)', errEgunak: 'Asteko egunak',
+  errOharra: 'Errepikatzen diren gertaerek ez dute abisu-emailik. Egunero goizeko emailean agertzen dira.',
+  ezabauEgunHau: 'Egun hau bakarrik ezabau'
 };
 // REVIEW END
 const T = Object.assign({}, T_OK, T_REVIEW);
@@ -457,15 +461,33 @@ async function refreshExt(force) {
    Items per day (everything the views draw comes from here)
    ============================================================ */
 const typeOf = id => S.types.find(t => t.id === id);
+// Does event `e` fall on `date`? Handles the optional repeat rule e.errepikapena =
+// { mota: egunero|astero|hilero|urtero, tartea, egunak:[0..6 Mon=0], arte, salbuetsiak:[dates] }
+function occurs(e, date) {
+  const r = e.errepikapena;
+  if (r && (r.salbuetsiak || []).includes(date)) return false;
+  if (e.data === date) return true;
+  if (!r || date < e.data) return false;
+  if (r.arte && date > r.arte) return false;
+  const n = Math.max(1, r.tartea || 1), a = pd(e.data), b = pd(date);
+  if (r.mota === 'egunero') return diffD(e.data, date) % n === 0;
+  if (r.mota === 'astero') {
+    const days = (r.egunak && r.egunak.length) ? r.egunak : [wd(e.data)];
+    return days.includes(wd(date)) && (diffD(weekStart(e.data), weekStart(date)) / 7) % n === 0;
+  }
+  if (r.mota === 'hilero') return (((b.getFullYear() - a.getFullYear()) * 12 + b.getMonth() - a.getMonth()) % n === 0) && b.getDate() === a.getDate();
+  if (r.mota === 'urtero') return ((b.getFullYear() - a.getFullYear()) % n === 0) && b.getMonth() === a.getMonth() && b.getDate() === a.getDate();
+  return false;
+}
 function itemsFor(date) {
   const out = [];
-  S.events.filter(e => e.data === date).forEach(e => {
+  S.events.filter(e => occurs(e, date)).forEach(e => {
     const t = typeOf(e.motaId);
     if (S.hiddenTypes.includes(e.motaId || '_')) return;
     out.push({
       kind: 'own', id: e.id, title: e.izenburua || '', icon: t ? t.ikonoa : '•', color: t ? t.kolorea : '#9ca3af',
       sub: (e.egunOsoa ? T.egunOsoa : (e.hasiera ? e.hasiera + (e.amaiera ? '–' + e.amaiera : '') : '')) + (t ? (e.egunOsoa || e.hasiera ? ' · ' : '') + t.izena : ''),
-      order: e.egunOsoa ? -3 : (e.hasiera ? mins(e.hasiera) : 1439), bell: e.abisuaNoiz != null, sent: !!e.bidalita
+      order: e.egunOsoa ? -3 : (e.hasiera ? mins(e.hasiera) : 1439), bell: e.abisuaNoiz != null && !e.errepikapena, sent: !!e.bidalita, rep: !!e.errepikapena, date
     });
   });
   if (S.layers.cycles) S.cycles.forEach(c => {
@@ -507,14 +529,14 @@ function tagOf(it) {
   if (it.kind === 'ghost') return it.state === 'egina' ? '✓' : it.state === 'saltatuta' ? '↷' : '';
   if (it.kind === 'imp') return 'Google';
   if (it.kind === 'ext') return it.src === 'ascension' ? 'ASC' : 'SUT';
-  return it.bell ? (it.sent ? '🔔✓' : '🔔') : '';
+  return (it.rep ? '↻' : '') + (it.bell ? (it.sent ? '🔔✓' : '🔔') : '');
 }
 function itemHtml(it, date) {
   const cls = 'it ' + it.kind + (it.state === 'egina' || it.done ? ' done' : '') + (it.state === 'saltatuta' ? ' skipped' : '');
   const inner = `<span class="ico">${esc(it.icon)}</span><span class="tx"><b>${esc(it.title)}</b><small>${esc(it.sub || '')}</small></span>` +
     (tagOf(it) ? `<span class="tag">${esc(tagOf(it))}</span>` : '');
   const st = `style="--c:${esc(it.color)}"`;
-  if (it.kind === 'own') return `<button class="${cls}" ${st} data-act="evt" data-id="${esc(it.id)}">${inner}</button>`;
+  if (it.kind === 'own') return `<button class="${cls}" ${st} data-act="evt" data-id="${esc(it.id)}" data-d="${date}">${inner}</button>`;
   if (it.kind === 'ghost') return `<button class="${cls}" ${st} data-act="ghost" data-cid="${esc(it.cid)}" data-d="${date}">${inner}</button>`;
   if (it.kind === 'imp') return `<button class="${cls}" ${st} data-act="imp" data-id="${esc(it.id)}">${inner}</button>`;
   return `<div class="${cls}" ${st}>${inner}</div>`;
@@ -561,7 +583,7 @@ function titleOf() {
 }
 function todaysReminders() {
   const t = todayS();
-  return S.events.filter(e => e.data === t && e.abisuaNoiz != null).sort((a, b) => a.abisuaNoiz - b.abisuaNoiz);
+  return S.events.filter(e => e.data === t && e.abisuaNoiz != null && !e.errepikapena).sort((a, b) => a.abisuaNoiz - b.abisuaNoiz);
 }
 function render() {
   const [a, b] = titleOf();
@@ -605,10 +627,11 @@ function readExtras() {
   return o;
 }
 const LEADS = [[10, 'lead10'], [30, 'lead30'], [60, 'lead60'], [120, 'lead120'], [1440, 'lead1440'], [2880, 'lead2880']];
-function editEvent(id, date) {
+function editEvent(id, date, occ) {
   const e = id ? S.events.find(x => x.id === id) : null;
-  D = { id: id || newId(C.ev), isNew: !e, prev: e || null, extras: e ? e.eremuak || {} : {} };
+  D = { id: id || newId(C.ev), isNew: !e, prev: e || null, extras: e ? e.eremuak || {} : {}, occ: occ || null };
   const v = e || { izenburua: '', data: date || S.sel, hasiera: '', amaiera: '', egunOsoa: false, oharrak: '', motaId: '', abisuMin: null };
+  const rp = (e && e.errepikapena) || {};
   openSheet(`
     <h2>${e ? T.editau : T.gehitu}</h2>
     <label>${T.izenburua}</label><input id="ev-title" value="${esc(v.izenburua)}" autocomplete="off">
@@ -622,30 +645,51 @@ function editEvent(id, date) {
       <div><label>${T.amaiera}</label><input id="ev-end" type="time" value="${esc(v.amaiera || '')}"></div>
     </div>
     <label>${T.oharrak}</label><textarea id="ev-notes">${esc(v.oharrak || '')}</textarea>
+    <label>${T.errepikapena}</label>
+    <select id="ev-rep"><option value="">${T.errEz}</option>${[['egunero', 'errEgunero'], ['astero', 'errAstero'], ['hilero', 'errHilero'], ['urtero', 'errUrtero']].map(([m, k]) => `<option value="${m}" ${rp.mota === m ? 'selected' : ''}>${T[k]}</option>`).join('')}</select>
+    <div id="ev-repbox" style="${rp.mota ? '' : 'display:none'}">
+      <div class="two"><div><label>${T.errTartea}</label><input id="ev-int" type="number" min="1" value="${rp.tartea || 1}"></div>
+      <div><label>${T.errArte}</label><input id="ev-until" type="date" value="${esc(rp.arte || '')}"></div></div>
+      <div id="ev-wdbox" style="${rp.mota === 'astero' ? '' : 'display:none'}"><label>${T.errEgunak}</label>
+        <div class="chips">${T.dayNames.map((n, i) => `<label class="chip ${(rp.egunak || []).includes(i) ? 'on' : ''}" style="margin:0"><input type="checkbox" class="ev-wd" value="${i}" ${(rp.egunak || []).includes(i) ? 'checked' : ''} style="display:none">${esc(T.dayInit[i])}</label>`).join('')}</div></div>
+      <p class="note">${T.errOharra}</p>
+    </div>
     <label>${T.abisua}</label>
-    <select id="ev-lead"><option value="">${T.abisurikEz}</option>${LEADS.map(([m, k]) => `<option value="${m}" ${v.abisuMin === m ? 'selected' : ''}>${T[k]}</option>`).join('')}</select>
+    <select id="ev-lead" ${rp.mota ? 'disabled' : ''}><option value="">${T.abisurikEz}</option>${LEADS.map(([m, k]) => `<option value="${m}" ${v.abisuMin === m ? 'selected' : ''}>${T[k]}</option>`).join('')}</select>
     <p class="note warn">${T.abisuAzalpena}</p>
     <div class="btns">
       <button class="btn grow" data-act="evSave">${T.gorde}</button>
       <button class="btn ghost" data-act="close">${T.utzi}</button>
       ${e ? `<button class="btn danger" data-act="evDel">${T.ezabau}</button>` : ''}
+      ${e && e.errepikapena && D.occ ? `<button class="btn ghost" data-act="evSkipOcc">${T.ezabauEgunHau} (${esc(D.occ.slice(5))})</button>` : ''}
     </div>`);
 }
 async function saveEvent() {
   const title = val('ev-title').trim(); if (!title) { toast(T.izenburuaBeharra); return; }
   const date = val('ev-date'); if (!date) { toast(T.dataBeharra); return; }
   const allDay = $('ev-allday').checked, start = allDay ? '' : val('ev-start'), end = allDay ? '' : val('ev-end');
-  const lead = val('ev-lead') === '' ? null : Number(val('ev-lead'));
+  const repMota = val('ev-rep');
+  const errepikapena = repMota ? {
+    mota: repMota, tartea: Math.max(1, Number(val('ev-int')) || 1),
+    egunak: repMota === 'astero' ? [...document.querySelectorAll('.ev-wd:checked')].map(x => Number(x.value)) : [],
+    arte: val('ev-until') || null, salbuetsiak: (D.prev && D.prev.errepikapena && D.prev.errepikapena.salbuetsiak) || []
+  } : null;
+  const lead = (repMota || val('ev-lead') === '') ? null : Number(val('ev-lead'));
   const noiz = lead == null ? null : reminderAt(date, start, allDay, lead);
   const prev = D.prev;
   const data = {
     izenburua: title, data: date, hasiera: start, amaiera: end, egunOsoa: allDay, oharrak: val('ev-notes'),
-    motaId: val('ev-type'), eremuak: readExtras(), abisuMin: lead, abisuaNoiz: noiz,
+    motaId: val('ev-type'), eremuak: readExtras(), abisuMin: lead, abisuaNoiz: noiz, errepikapena,
     bidalita: !!(prev && prev.bidalita && prev.abisuaNoiz === noiz), sortua: prev ? prev.sortua || Date.now() : Date.now()
   };
   const id = D.id; closeSheet();
   await fsSet(doc(db, 'gertaerak', id), data);
   S.sel = date; if (S.view === 'day') S.cur = date; render();
+}
+async function skipOccurrence() {
+  const e = D.prev, d = D.occ; if (!e || !e.errepikapena || !d) return;
+  const r = Object.assign({}, e.errepikapena, { salbuetsiak: [...new Set([...(e.errepikapena.salbuetsiak || []), d])] });
+  const id = D.id; closeSheet(); await fsUpd(doc(db, 'gertaerak', id), { errepikapena: r });
 }
 async function deleteEvent() {
   if (!confirm(T.ziur)) return;
@@ -836,6 +880,12 @@ function buildIcs() {
       L.push('DTSTART:' + dt(e.data, e.hasiera));
       L.push('DTEND:' + dt(e.data, e.amaiera || e.hasiera));
     }
+    if (e.errepikapena) {
+      const r = e.errepikapena, F = { egunero: 'DAILY', astero: 'WEEKLY', hilero: 'MONTHLY', urtero: 'YEARLY' }[r.mota];
+      const BD = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+      L.push('RRULE:FREQ=' + F + ';INTERVAL=' + (r.tartea || 1) + (r.mota === 'astero' && (r.egunak || []).length ? ';BYDAY=' + r.egunak.map(i => BD[i]).join(',') : '') + (r.arte ? ';UNTIL=' + dt(r.arte) : ''));
+      (r.salbuetsiak || []).forEach(x => L.push((e.egunOsoa || !e.hasiera ? 'EXDATE;VALUE=DATE:' + dt(x) : 'EXDATE:' + dt(x, e.hasiera))));
+    }
     if (e.oharrak) L.push('DESCRIPTION:' + icsEsc(e.oharrak));
     if (t) L.push('CATEGORIES:' + icsEsc(t.izena));
     if (e.abisuMin != null) L.push('BEGIN:VALARM', 'TRIGGER:-PT' + e.abisuMin + 'M', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEsc(e.izenburua), 'END:VALARM');
@@ -850,7 +900,7 @@ function exportIcs() {
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   toast(S.events.length + ' ✓');
 }
-window.__egutegie = { buildIcs, S, cycStep, itemsFor };       // handle for the CDP tests
+window.__egutegie = { buildIcs, S, cycStep, itemsFor, occurs };       // handle for the CDP tests
 
 /* ============================================================
    Event wiring
@@ -859,11 +909,11 @@ const ACT = {
   view: d => { S.view = d.v; LS.set('view', S.view); if (S.view === 'agenda' || S.view === 'day') S.cur = S.sel; render(); },
   selday: d => { S.sel = d.d; S.cur = d.d; render(); },
   goday: d => { S.sel = d.d; S.cur = d.d; S.view = 'day'; LS.set('view', 'day'); render(); },
-  evt: d => editEvent(d.id),
+  evt: d => editEvent(d.id, null, d.d),
   imp: d => showImported(d.id),
   ghost: d => ghostSheet(d.cid, d.d),
   close: closeSheet,
-  evSave: saveEvent, evDel: deleteEvent,
+  evSave: saveEvent, evDel: deleteEvent, evSkipOcc: skipOccurrence,
   cyc: async d => {
     const { cid, date } = D, k = d.a === 'mugitu' ? Number(val('cy-shift')) : 0;
     closeSheet(); await cycAct(cid, date, d.a, k);
@@ -903,6 +953,12 @@ document.addEventListener('click', e => {
 document.addEventListener('change', e => {
   if (e.target.id === 'ev-type') { D.extras = Object.assign(D.extras || {}, readExtras()); $('ev-extras').innerHTML = extrasHtml(e.target.value, D.extras); }
   if (e.target.id === 'ev-allday') $('ev-times').style.display = e.target.checked ? 'none' : '';
+  if (e.target.id === 'ev-rep') {
+    const m = e.target.value;
+    $('ev-repbox').style.display = m ? '' : 'none'; $('ev-wdbox').style.display = m === 'astero' ? '' : 'none';
+    $('ev-lead').disabled = !!m; if (m) $('ev-lead').value = '';
+  }
+  if (e.target.classList && e.target.classList.contains('ev-wd')) e.target.parentElement.classList.toggle('on', e.target.checked);
 });
 $('scrim').addEventListener('click', closeSheet);
 $('fab').addEventListener('click', () => editEvent(null, S.view === 'month' || S.view === 'day' || S.view === 'week' ? S.sel : todayS()));
