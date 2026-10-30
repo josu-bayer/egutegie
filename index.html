@@ -931,7 +931,7 @@ window.__egutegie = { buildIcs, S, cycStep, itemsFor, occurs };       // handle 
    ============================================================ */
 const ACT = {
   view: d => { S.view = d.v; LS.set('view', S.view); if (S.view === 'agenda' || S.view === 'day') S.cur = S.sel; render(); },
-  selday: d => { S.sel = d.d; S.cur = d.d; render(); },
+  selday: d => { S.sel = d.d; S.cur = d.d; S.view = 'day'; LS.set('view', 'day'); render(); },   // tapping a day in month view opens it in day view
   goday: d => { S.sel = d.d; S.cur = d.d; S.view = 'day'; LS.set('view', 'day'); render(); },
   evt: d => editEvent(d.id, null, d.d),
   imp: d => showImported(d.id),
