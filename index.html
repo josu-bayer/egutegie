@@ -997,19 +997,24 @@ function nav(n) {
   else { S.cur = addD(S.cur, 14 * n); S.sel = S.cur; }
   render();
 }
-// Swipe sideways on the calendar: left = next month/week/day, right = previous (same as the arrows)
+// Swipe sideways: on events/headers left = next month/week/day, right = previous (same as the arrows).
+// In day view, a sideways swipe that starts on empty space goes back to month view.
 (function () {
-  let x0 = 0, y0 = 0, t0 = 0, on = false;
-  const m = $('main');
-  m.addEventListener('touchstart', e => {
+  let x0 = 0, y0 = 0, t0 = 0, on = false, empty = false;
+  document.addEventListener('touchstart', e => {
     on = e.touches.length === 1 && !$('sheetRoot').classList.contains('open');
-    if (on) { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now(); }
+    if (!on) return;
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
+    const tg = e.target.closest ? e.target : e.target.parentElement;
+    empty = S.view === 'day' && !tg.closest('.it, .dayhead, .top, #sheetRoot, #fab');
+    if (!empty && !tg.closest('#main')) on = false;       // header and buttons never swipe
   }, { passive: true });
-  m.addEventListener('touchend', e => {
+  document.addEventListener('touchend', e => {
     if (!on) return; on = false;
     const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
     if (Date.now() - t0 > 700 || Math.abs(dx) < 60 || Math.abs(dx) < 1.6 * Math.abs(dy)) return;
-    nav(dx < 0 ? 1 : -1);
+    if (empty) { S.view = 'month'; LS.set('view', 'month'); S.cur = S.sel; render(); }
+    else nav(dx < 0 ? 1 : -1);
   }, { passive: true });
 })();
 $('title').addEventListener('click', () => { S.cur = todayS(); S.sel = todayS(); render(); });
