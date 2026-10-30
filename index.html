@@ -51,6 +51,10 @@ main{padding:10px 12px 0}
 .lbl.ghost{border-left-style:dashed;background:none;border-top:1px dashed color-mix(in srgb,var(--c,#888) 50%,transparent);border-bottom:1px dashed color-mix(in srgb,var(--c,#888) 50%,transparent);border-right:1px dashed color-mix(in srgb,var(--c,#888) 50%,transparent)}
 .lbl.imp{background:none;border:1px solid color-mix(in srgb,var(--c,#9aa) 60%,transparent);border-left:2.5px solid var(--c,#9aa)}
 .cell.other{opacity:.38}
+.cell.past{opacity:.5;filter:saturate(.45)}
+.cell.past.other{opacity:.28}
+.cell.past.sel{opacity:.8}
+.pastday{opacity:.55;filter:saturate(.45)}
 .cell.today .n{background:var(--accent);color:#06241f;border-radius:999px}
 .cell.sel{border-color:var(--accent2)}
 .cell .n{font-weight:700;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center}
@@ -549,8 +553,9 @@ function itemHtml(it, date) {
 function dayBlock(date, withHead, items) {
   items = items || itemsFor(date);
   const t = date === todayS();
-  return (withHead ? `<div class="dayhead ${t ? 'today' : ''}" data-act="goday" data-d="${date}"><span>${esc(longDay(date))}</span><small>${t ? T.gaur : ''}</small></div>` : '') +
+  const html = (withHead ? `<div class="dayhead ${t ? 'today' : ''}" data-act="goday" data-d="${date}"><span>${esc(longDay(date))}</span><small>${t ? T.gaur : ''}</small></div>` : '') +
     (items.length ? items.map(i => itemHtml(i, date)).join('') : `<div class="empty">${T.hutsik}</div>`);
+  return date < todayS() ? `<div class="pastday">${html}</div>` : html;
 }
 
 const MONTH_LABELS = 3;
@@ -566,7 +571,7 @@ function viewMonth() {
     const shown = named.slice(0, MONTH_LABELS), hidden = named.length - shown.length;
     const lbls = shown.map(x => `<span class="lbl ${x.kind === 'own' ? '' : x.kind}" style="--c:${esc(x.color)}">${esc(x.title)}</span>`).join('');
     const dots = linked.slice(0, 4).map(x => `<span class="dot ext" style="--c:${esc(x.color)}"></span>`).join('');
-    h += `<button class="cell ${pd(d).getMonth() !== curM ? 'other' : ''} ${d === t ? 'today' : ''} ${d === S.sel ? 'sel' : ''}" data-act="selday" data-d="${d}">` +
+    h += `<button class="cell ${pd(d).getMonth() !== curM ? 'other' : ''} ${d === t ? 'today' : ''} ${d < t ? 'past' : ''} ${d === S.sel ? 'sel' : ''}" data-act="selday" data-d="${d}">` +
       `<span class="n">${pd(d).getDate()}</span><span class="lbls">${lbls}</span>` +
       (hidden > 0 ? `<span class="more">+${hidden}</span>` : '') + (dots ? `<span class="dots">${dots}</span>` : '') + `</button>`;
   }
