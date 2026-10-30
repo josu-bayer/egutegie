@@ -146,6 +146,7 @@ const T_OK = {
   monthNames: ['Urtarrile', 'Zezeile', 'Martie', 'Aprile', 'Maiatze', 'Bagile', 'Garagarrile', 'Agustue', 'Iraile', 'Urrie', 'Zemendie', 'Abendue'],
   dayNames: ['astelena', 'martitzena', 'eguztena', 'eguena', 'barikue', 'zapatue', 'domeka'],
   gehitu: 'Gehitu', gorde: 'Gorde', ezabau: 'Ezabau', editau: 'Editau', ezarpenak: 'Ezarpenak',
+  amaieraData: 'Amaiera-data (hainbat egunekoa bada)', eguna: 'eguna',
   data: 'Data', izena: 'Izena', gaur: 'Gaur', ziur: 'Ziur zauz?',
   syncOk: 'Sinkronizeuta', syncNo: 'Ez dau sinkronizeuta', offline: 'Offline',
   gosaria: 'Gosaria', bazkaria: 'Bazkaria', afaria: 'Afaria'              // as shown in Sutelagun
@@ -476,6 +477,7 @@ function occurs(e, date) {
   const r = e.errepikapena;
   if (r && (r.salbuetsiak || []).includes(date)) return false;
   if (e.data === date) return true;
+  if (e.amaieraData && !r) return date > e.data && date <= e.amaieraData;
   if (!r || date < e.data) return false;
   if (r.arte && date > r.arte) return false;
   const n = Math.max(1, r.tartea || 1), a = pd(e.data), b = pd(date);
@@ -495,7 +497,7 @@ function itemsFor(date) {
     if (S.hiddenTypes.includes(e.motaId || '_')) return;
     out.push({
       kind: 'own', id: e.id, title: e.izenburua || '', icon: t ? t.ikonoa : '•', color: t ? t.kolorea : '#9ca3af',
-      sub: (e.egunOsoa ? T.egunOsoa : (e.hasiera ? e.hasiera + (e.amaiera ? '–' + e.amaiera : '') : '')) + (t ? (e.egunOsoa || e.hasiera ? ' · ' : '') + t.izena : ''),
+      sub: (e.amaieraData && !e.errepikapena ? (diffD(e.data, date) + 1) + '/' + (diffD(e.data, e.amaieraData) + 1) + ' ' + T.eguna + ' · ' : '') + (e.egunOsoa ? T.egunOsoa : (e.hasiera ? e.hasiera + (e.amaiera ? '–' + e.amaiera : '') : '')) + (t ? (e.egunOsoa || e.hasiera ? ' · ' : '') + t.izena : ''),
       order: e.egunOsoa ? -3 : (e.hasiera ? mins(e.hasiera) : 1439), bell: e.abisuaNoiz != null && !e.errepikapena, sent: !!e.bidalita, rep: !!e.errepikapena, date
     });
   });
@@ -657,6 +659,7 @@ function editEvent(id, date, occ) {
     <select id="ev-type"><option value="">${T.motarikGabe}</option>${S.types.map(t => `<option value="${esc(t.id)}" ${t.id === v.motaId ? 'selected' : ''}>${esc(t.ikonoa)} ${esc(t.izena)}</option>`).join('')}</select>
     <div id="ev-extras">${extrasHtml(v.motaId, D.extras)}</div>
     <label>${T.data}</label><input id="ev-date" type="date" value="${esc(v.data)}">
+    <label>${T.amaieraData}</label><input id="ev-enddate" type="date" value="${esc(v.amaieraData || '')}" ${rp.mota ? 'disabled' : ''}>
     <label><input type="checkbox" id="ev-allday" ${v.egunOsoa ? 'checked' : ''}> ${T.egunOsoa}</label>
     <div class="two" id="ev-times" style="${v.egunOsoa ? 'display:none' : ''}">
       <div><label>${T.hasiera}</label><input id="ev-start" type="time" value="${esc(v.hasiera || '')}"></div>
@@ -687,6 +690,8 @@ async function saveEvent() {
   const date = val('ev-date'); if (!date) { toast(T.dataBeharra); return; }
   const allDay = $('ev-allday').checked, start = allDay ? '' : val('ev-start'), end = allDay ? '' : val('ev-end');
   const repMota = val('ev-rep');
+  const endDate = repMota ? '' : val('ev-enddate');
+  if (endDate && endDate < date) { toast(T.dataBeharra); return; }
   const errepikapena = repMota ? {
     mota: repMota, tartea: Math.max(1, Number(val('ev-int')) || 1),
     egunak: repMota === 'astero' ? [...document.querySelectorAll('.ev-wd:checked')].map(x => Number(x.value)) : [],
@@ -696,7 +701,7 @@ async function saveEvent() {
   const noiz = lead == null ? null : reminderAt(date, start, allDay, lead);
   const prev = D.prev;
   const data = {
-    izenburua: title, data: date, hasiera: start, amaiera: end, egunOsoa: allDay, oharrak: val('ev-notes'),
+    izenburua: title, data: date, amaieraData: endDate > date ? endDate : '', hasiera: start, amaiera: end, egunOsoa: allDay, oharrak: val('ev-notes'),
     motaId: val('ev-type'), eremuak: readExtras(), abisuMin: lead, abisuaNoiz: noiz, errepikapena,
     bidalita: !!(prev && prev.bidalita && prev.abisuaNoiz === noiz), sortua: prev ? prev.sortua || Date.now() : Date.now()
   };
@@ -893,10 +898,11 @@ function buildIcs() {
   S.events.slice().sort((a, b) => (a.data + (a.hasiera || '')).localeCompare(b.data + (b.hasiera || ''))).forEach(e => {
     const t = typeOf(e.motaId);
     L.push('BEGIN:VEVENT', 'UID:' + e.id + '@egutegie', 'DTSTAMP:' + stamp, 'SUMMARY:' + icsEsc(e.izenburua));
-    if (e.egunOsoa || !e.hasiera) { L.push('DTSTART;VALUE=DATE:' + dt(e.data), 'DTEND;VALUE=DATE:' + dt(addD(e.data, 1))); }
+    const lastDay = e.amaieraData && !e.errepikapena ? e.amaieraData : e.data;
+    if (e.egunOsoa || !e.hasiera) { L.push('DTSTART;VALUE=DATE:' + dt(e.data), 'DTEND;VALUE=DATE:' + dt(addD(lastDay, 1))); }
     else {
       L.push('DTSTART:' + dt(e.data, e.hasiera));
-      L.push('DTEND:' + dt(e.data, e.amaiera || e.hasiera));
+      L.push('DTEND:' + dt(lastDay, e.amaiera || e.hasiera));
     }
     if (e.errepikapena) {
       const r = e.errepikapena, F = { egunero: 'DAILY', astero: 'WEEKLY', hilero: 'MONTHLY', urtero: 'YEARLY' }[r.mota];
@@ -975,6 +981,7 @@ document.addEventListener('change', e => {
     const m = e.target.value;
     $('ev-repbox').style.display = m ? '' : 'none'; $('ev-wdbox').style.display = m === 'astero' ? '' : 'none';
     $('ev-lead').disabled = !!m; if (m) $('ev-lead').value = '';
+    $('ev-enddate').disabled = !!m; if (m) $('ev-enddate').value = '';
   }
   if (e.target.classList && e.target.classList.contains('ev-wd')) e.target.parentElement.classList.toggle('on', e.target.checked);
 });
