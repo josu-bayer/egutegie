@@ -241,7 +241,13 @@ const addMonths = (s, n) => { const d = pd(monthStart(s)); d.setMonth(d.getMonth
 const weekStart = s => addD(s, -wd(s));
 const mins = hhmm => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const longDay = s => T.dayNames[wd(s)] + ', ' + pd(s).getDate() + ' ' + T.monthNames[pd(s).getMonth()].toLowerCase();
+// Year + genitive: 2026ko, 2025eko. The suffix is -eko when the spoken year ends in a consonant (bat, bost, hamar...).
+const yearKo = y => {
+  const n = y % 100, c = n !== 0 && (n % 10 === 1 && n !== 11 || n % 10 === 5 || (n % 10 === 0 && n % 20 === 10));
+  return y + (c ? 'eko' : 'ko');
+};
+const monthK = m => T.monthNames[m].toLowerCase() + 'k';      // day labels put the month first, with -k: zemendiek 5
+const longDay = s => T.dayNames[wd(s)] + ', ' + monthK(pd(s).getMonth()) + ' ' + pd(s).getDate();
 
 // Epoch ms of the moment a reminder fires. All-day events count from 09:00 of that day.
 function reminderAt(dateS, startS, allDay, leadMin) {
@@ -597,8 +603,8 @@ function viewAgenda() {
 }
 function titleOf() {
   const d = pd(S.cur);
-  if (S.view === 'month') return [T.monthNames[d.getMonth()] + ' ' + d.getFullYear(), ''];
-  if (S.view === 'week') { const a = weekStart(S.cur), b = addD(a, 6); return [pd(a).getDate() + ' – ' + pd(b).getDate() + ' ' + T.monthNames[pd(b).getMonth()], d.getFullYear() + ''] }
+  if (S.view === 'month') return [yearKo(d.getFullYear()) + ' ' + T.monthNames[d.getMonth()].toLowerCase(), ''];
+  if (S.view === 'week') { const a = weekStart(S.cur), b = addD(a, 6); const ma = pd(a).getMonth(), mb = pd(b).getMonth(); return [monthK(ma) + ' ' + pd(a).getDate() + ' – ' + (ma === mb ? '' : monthK(mb) + ' ') + pd(b).getDate(), d.getFullYear() + ''] }
   if (S.view === 'day') return [longDay(S.cur), d.getFullYear() + ''];
   return [T.vAgenda, longDay(S.cur)];
 }
