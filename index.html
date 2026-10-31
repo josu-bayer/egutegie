@@ -78,6 +78,7 @@ h3{margin:16px 0 8px;font-size:.85rem;color:var(--muted);text-transform:none;let
 .it.ghost{border-style:dashed;border-left-style:solid;background:transparent}
 .it.imp{background:rgba(122,162,255,.07)}
 .it.ext{background:rgba(255,255,255,.03);border-left-style:dotted}
+.it{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 .it.done{opacity:.55}
 .it.done b{text-decoration:line-through}
 .it.skipped{opacity:.4}
@@ -162,7 +163,8 @@ const T_REVIEW = {
   abisua: 'Abisua', abisurikEz: 'Abisurik ez',
   lead10: '10 minutu lehenago', lead30: '30 minutu lehenago', lead60: 'ordu 1 lehenago', lead120: '2 ordu lehenago',
   lead1440: 'egun 1 lehenago', lead2880: '2 egun lehenago',
-  abisuAzalpena: 'Abisu-emailak minutu bat edo bi berandu iritsi daitezke. Ez dira berehalakoak.',
+  abisuAzalpena: 'Abisuak telefonora iristen dira (Telegram), minutu bat edo bi berandu. Ez dira berehalakoak.',
+  abisuEgunOsoa: 'Egun osoko gertaeretan abisua 09:00tik kontatzen da: "2 ordu lehenago" = 07:00etan.',
   izenburuaBeharra: 'Izenburua falta da', dataBeharra: 'Data falta da', izenaBeharra: 'Izena falta da',
   zikloBeharra: 'Izena eta gutxienez 2 pauso behar dira',
   googleIrakurtzeSoilik: 'Google Egutegitik ekarria. Irakurtzeko soilik.',
@@ -178,11 +180,11 @@ const T_REVIEW = {
   zikloak: 'Zikloak', lZikloak: 'Zikloak', lGoogle: 'Google Egutegia', geruzak: 'Geruzak',
   gaurkoAbisuak: 'Gaurko abisuak', bidalita: 'Bidalita', zain: 'Zain',
   esportatuIcs: 'Esportatu (.ics)', abisuProba: 'Abisu-proba sortu',
-  probaSortua: 'Proba sortuta. Email bat iritsi beharko litzateke minutu pare batean.',
+  probaSortua: 'Proba sortuta. Mezu bat iritsi beharko litzateke minutu pare batean.',
   freskatzen: 'Freskatzen…',
   errepikapena: 'Errepikapena', errEz: 'Ez da errepikatzen', errEgunero: 'Egunero', errAstero: 'Astero', errHilero: 'Hilero', errUrtero: 'Urtero',
   errTartea: 'Tartea (zenbatero)', errArte: 'Arte (hautazkoa)', errEgunak: 'Asteko egunak',
-  errOharra: 'Errepikatzen diren gertaerek ez dute abisu-emailik. Egunero goizeko emailean agertzen dira.',
+  errOharra: 'Errepikatzen diren gertaerek ere izan dezakete abisua. Egunero goizeko mezuan agertzen dira.',
   ezabauEgunHau: 'Egun hau bakarrik ezabau'
 };
 // REVIEW END
@@ -255,6 +257,21 @@ function reminderAt(dateS, startS, allDay, leadMin) {
   const hhmm = (!allDay && startS) ? startS : '09:00';
   const [h, mi] = hhmm.split(':').map(Number);
   return new Date(y, m - 1, d, h, mi).getTime() - leadMin * 60000;
+}
+// Next reminder of event `e` strictly after epoch `from`, as { at, date } (date = the occurrence it belongs to), or null.
+// Repeating events skip completed (osatuak) and deleted (salbuetsiak) days. Mirrored by nextReminder_ in Code.gs.
+function nextReminder(e, from) {
+  if (e.abisuMin == null) return null;
+  if (!e.errepikapena) return { at: reminderAt(e.data, e.hasiera, e.egunOsoa, e.abisuMin), date: e.data };
+  const done = e.osatuak || [];
+  let d = addD(ds(new Date(from)), -1); if (d < e.data) d = e.data;
+  for (let i = 0; i < 800; i++, d = addD(d, 1)) {
+    if (e.errepikapena.arte && d > e.errepikapena.arte) return null;
+    if (!occurs(e, d) || done.includes(d)) continue;
+    const at = reminderAt(d, e.hasiera, e.egunOsoa, e.abisuMin);
+    if (at > from) return { at, date: d };
+  }
+  return null;
 }
 
 /* ============================================================
@@ -505,7 +522,11 @@ function itemsFor(date) {
     out.push({
       kind: 'own', id: e.id, title: e.izenburua || '', icon: t ? t.ikonoa : '•', color: t ? t.kolorea : '#9ca3af',
       sub: (e.amaieraData && !e.errepikapena ? (diffD(e.data, date) + 1) + '/' + (diffD(e.data, e.amaieraData) + 1) + ' ' + T.eguna + ' · ' : '') + (e.egunOsoa ? T.egunOsoa : (e.hasiera ? e.hasiera + (e.amaiera ? '–' + e.amaiera : '') : '')) + (t ? (e.egunOsoa || e.hasiera ? ' · ' : '') + t.izena : ''),
-      order: e.egunOsoa ? -3 : (e.hasiera ? mins(e.hasiera) : 1439), bell: e.abisuaNoiz != null && !e.errepikapena, sent: !!e.bidalita, rep: !!e.errepikapena, date
+      order: e.egunOsoa ? -3 : (e.hasiera ? mins(e.hasiera) : 1439), rep: !!e.errepikapena, date,
+      done: (e.osatuak || []).includes(date),
+      // a repeating event keeps one pending reminder in abisuaNoiz (the next one), so earlier days count as sent
+      bell: e.errepikapena ? e.abisuMin != null && date >= todayS() : e.abisuaNoiz != null,
+      sent: e.errepikapena ? e.abisuaNoiz == null || reminderAt(date, e.hasiera, e.egunOsoa, e.abisuMin) < e.abisuaNoiz : !!e.bidalita
     });
   });
   if (S.layers.cycles) S.cycles.forEach(c => {
@@ -547,7 +568,7 @@ function tagOf(it) {
   if (it.kind === 'ghost') return it.state === 'egina' ? '✓' : it.state === 'saltatuta' ? '↷' : '';
   if (it.kind === 'imp') return 'Google';
   if (it.kind === 'ext') return it.src === 'ascension' ? 'ASC' : 'SUT';
-  return (it.rep ? '↻' : '') + (it.bell ? (it.sent ? '🔔✓' : '🔔') : '');
+  return (it.done ? '✓' : '') + (it.rep ? '↻' : '') + (it.bell && !it.done ? (it.sent ? '🔔✓' : '🔔') : '');
 }
 function itemHtml(it, date) {
   const cls = 'it ' + it.kind + (it.state === 'egina' || it.done ? ' done' : '') + (it.state === 'saltatuta' ? ' skipped' : '');
@@ -609,8 +630,15 @@ function titleOf() {
   return [T.vAgenda, longDay(S.cur)];
 }
 function todaysReminders() {
-  const t = todayS();
-  return S.events.filter(e => e.data === t && e.abisuaNoiz != null && !e.errepikapena).sort((a, b) => a.abisuaNoiz - b.abisuaNoiz);
+  const t = todayS(), out = [];
+  S.events.forEach(e => {
+    if ((e.osatuak || []).includes(t)) return;
+    if (!e.errepikapena) { if (e.data === t && e.abisuaNoiz != null) out.push(e); return; }
+    if (e.abisuMin == null || !occurs(e, t)) return;
+    const at = reminderAt(t, e.hasiera, e.egunOsoa, e.abisuMin);
+    out.push(Object.assign({}, e, { abisuaNoiz: at, bidalita: e.abisuaNoiz == null || at < e.abisuaNoiz }));
+  });
+  return out.sort((a, b) => a.abisuaNoiz - b.abisuaNoiz);
 }
 function render() {
   const [a, b] = titleOf();
@@ -657,7 +685,8 @@ const LEADS = [[10, 'lead10'], [30, 'lead30'], [60, 'lead60'], [120, 'lead120'],
 function editEvent(id, date, occ) {
   const e = id ? S.events.find(x => x.id === id) : null;
   D = { id: id || newId(C.ev), isNew: !e, prev: e || null, extras: e ? e.eremuak || {} : {}, occ: occ || null };
-  const v = e || { izenburua: '', data: date || S.sel, hasiera: '', amaiera: '', egunOsoa: false, oharrak: '', motaId: '', abisuMin: null };
+  D.leadTouched = false;
+  const v = e || { izenburua: '', data: date || S.sel, hasiera: '', amaiera: '', egunOsoa: false, oharrak: '', motaId: '', abisuMin: 30 };   // new events default to 30 min before
   const rp = (e && e.errepikapena) || {};
   openSheet(`
     <h2>${e ? T.editau : T.gehitu}</h2>
@@ -683,8 +712,8 @@ function editEvent(id, date, occ) {
       <p class="note">${T.errOharra}</p>
     </div>
     <label>${T.abisua}</label>
-    <select id="ev-lead" ${rp.mota ? 'disabled' : ''}><option value="">${T.abisurikEz}</option>${LEADS.map(([m, k]) => `<option value="${m}" ${v.abisuMin === m ? 'selected' : ''}>${T[k]}</option>`).join('')}</select>
-    <p class="note warn">${T.abisuAzalpena}</p>
+    <select id="ev-lead"><option value="">${T.abisurikEz}</option>${LEADS.map(([m, k]) => `<option value="${m}" ${v.abisuMin === m ? 'selected' : ''}>${T[k]}</option>`).join('')}</select>
+    <p class="note warn">${T.abisuAzalpena}<br>${T.abisuEgunOsoa}</p>
     <div class="btns">
       <button class="btn grow" data-act="evSave">${T.gorde}</button>
       <button class="btn ghost" data-act="close">${T.utzi}</button>
@@ -704,12 +733,16 @@ async function saveEvent() {
     egunak: repMota === 'astero' ? [...document.querySelectorAll('.ev-wd:checked')].map(x => Number(x.value)) : [],
     arte: val('ev-until') || null, salbuetsiak: (D.prev && D.prev.errepikapena && D.prev.errepikapena.salbuetsiak) || []
   } : null;
-  const lead = (repMota || val('ev-lead') === '') ? null : Number(val('ev-lead'));
-  const noiz = lead == null ? null : reminderAt(date, start, allDay, lead);
+  const lead = val('ev-lead') === '' ? null : Number(val('ev-lead'));
   const prev = D.prev;
+  const amaieraData = endDate > date ? endDate : '';
+  // completed days only count while the event still happens on them
+  const osatuak = ((prev && prev.osatuak) || []).filter(d => occurs({ data: date, amaieraData, errepikapena }, d));
+  const nx = nextReminder({ data: date, hasiera: start, egunOsoa: allDay, abisuMin: lead, errepikapena, osatuak }, Date.now());
+  const noiz = nx ? nx.at : null;
   const data = {
-    izenburua: title, data: date, amaieraData: endDate > date ? endDate : '', hasiera: start, amaiera: end, egunOsoa: allDay, oharrak: val('ev-notes'),
-    motaId: val('ev-type'), eremuak: readExtras(), abisuMin: lead, abisuaNoiz: noiz, errepikapena,
+    izenburua: title, data: date, amaieraData, hasiera: start, amaiera: end, egunOsoa: allDay, oharrak: val('ev-notes'),
+    motaId: val('ev-type'), eremuak: readExtras(), abisuMin: lead, abisuaNoiz: noiz, abisuaData: nx ? nx.date : null, errepikapena, osatuak,
     bidalita: !!(prev && prev.bidalita && prev.abisuaNoiz === noiz), sortua: prev ? prev.sortua || Date.now() : Date.now()
   };
   const id = D.id; closeSheet();
@@ -719,7 +752,26 @@ async function saveEvent() {
 async function skipOccurrence() {
   const e = D.prev, d = D.occ; if (!e || !e.errepikapena || !d) return;
   const r = Object.assign({}, e.errepikapena, { salbuetsiak: [...new Set([...(e.errepikapena.salbuetsiak || []), d])] });
-  const id = D.id; closeSheet(); await fsUpd(doc(db, 'gertaerak', id), { errepikapena: r });
+  const upd = { errepikapena: r };
+  if (e.abisuMin != null) {                     // the pending reminder may have belonged to the deleted day
+    const nx = nextReminder(Object.assign({}, e, upd), Date.now());
+    Object.assign(upd, { abisuaNoiz: nx ? nx.at : null, abisuaData: nx ? nx.date : null, bidalita: false });
+  }
+  const id = D.id; closeSheet(); await fsUpd(doc(db, 'gertaerak', id), upd);
+}
+// Mark one occurrence (the day pressed) as completed, or undo it. A completed day sends no reminder.
+async function toggleDone(id, date) {
+  const e = S.events.find(x => x.id === id); if (!e || !date) return;
+  const set = new Set(e.osatuak || []), was = set.has(date);
+  if (was) set.delete(date); else set.add(date);
+  const upd = { osatuak: [...set] };
+  if (e.errepikapena && e.abisuMin != null) {
+    const nx = nextReminder(Object.assign({}, e, upd), Date.now());
+    Object.assign(upd, { abisuaNoiz: nx ? nx.at : null, abisuaData: nx ? nx.date : null, bidalita: false });
+  }
+  try { if (navigator.vibrate) navigator.vibrate(25); } catch (er) { }
+  toast(was ? T.desegin : T.egina + ' ✓');
+  await fsUpd(doc(db, 'gertaerak', id), upd);
 }
 async function deleteEvent() {
   if (!confirm(T.ziur)) return;
@@ -931,7 +983,7 @@ function exportIcs() {
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   toast(S.events.length + ' ✓');
 }
-window.__egutegie = { buildIcs, S, cycStep, itemsFor, occurs };       // handle for the CDP tests
+window.__egutegie = { buildIcs, S, cycStep, itemsFor, occurs, nextReminder, toggleDone, reminderAt };       // handle for the CDP tests
 
 /* ============================================================
    Event wiring
@@ -983,11 +1035,14 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'ev-type') { D.extras = Object.assign(D.extras || {}, readExtras()); $('ev-extras').innerHTML = extrasHtml(e.target.value, D.extras); }
-  if (e.target.id === 'ev-allday') $('ev-times').style.display = e.target.checked ? 'none' : '';
+  if (e.target.id === 'ev-allday') {
+    $('ev-times').style.display = e.target.checked ? 'none' : '';
+    if (D && D.isNew && !D.leadTouched) $('ev-lead').value = e.target.checked ? '120' : '30';   // default: 07:00 for all-day, 30 min before otherwise
+  }
+  if (e.target.id === 'ev-lead' && D) D.leadTouched = true;
   if (e.target.id === 'ev-rep') {
     const m = e.target.value;
     $('ev-repbox').style.display = m ? '' : 'none'; $('ev-wdbox').style.display = m === 'astero' ? '' : 'none';
-    $('ev-lead').disabled = !!m; if (m) $('ev-lead').value = '';
     $('ev-enddate').disabled = !!m; if (m) $('ev-enddate').value = '';
   }
   if (e.target.classList && e.target.classList.contains('ev-wd')) e.target.parentElement.classList.toggle('on', e.target.checked);
@@ -1022,6 +1077,30 @@ function nav(n) {
     if (empty) { S.view = 'month'; LS.set('view', 'month'); S.cur = S.sel; render(); }
     else nav(dx < 0 ? 1 : -1);
   }, { passive: true });
+})();
+// Hold an event for about half a second to mark that day as completed (hold again to undo).
+// Moving the finger or pointer more than 10px cancels it, and the click that follows a hold is swallowed.
+(function () {
+  const SEL = '[data-act="evt"][data-d]';
+  let timer = null, sx = 0, sy = 0, held = false, mute = 0;
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  const begin = (el, x, y) => {
+    cancel(); sx = x; sy = y;
+    timer = setTimeout(() => { timer = null; held = true; toggleDone(el.dataset.id, el.dataset.d); }, 550);
+  };
+  const finish = () => { cancel(); if (held) { held = false; mute = Date.now() + 500; } };
+  const target = e => (e.target.closest ? e.target : e.target.parentElement).closest(SEL);
+  const open = () => $('sheetRoot').classList.contains('open');
+  const moved = (x, y) => { if (timer && Math.hypot(x - sx, y - sy) > 10) cancel(); };
+  document.addEventListener('touchstart', e => { const el = e.touches.length === 1 && !open() && target(e); if (el) begin(el, e.touches[0].clientX, e.touches[0].clientY); else cancel(); }, { passive: true });
+  document.addEventListener('touchmove', e => moved(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  document.addEventListener('touchend', finish, { passive: true });
+  document.addEventListener('touchcancel', () => { cancel(); held = false; }, { passive: true });
+  document.addEventListener('mousedown', e => { const el = e.button === 0 && !open() && target(e); if (el) begin(el, e.clientX, e.clientY); });
+  document.addEventListener('mousemove', e => moved(e.clientX, e.clientY));
+  document.addEventListener('mouseup', finish);
+  document.addEventListener('contextmenu', e => { if (target(e)) e.preventDefault(); });
+  document.addEventListener('click', e => { if (Date.now() < mute) { e.stopPropagation(); e.preventDefault(); mute = 0; } }, true);
 })();
 $('title').addEventListener('click', () => { S.cur = todayS(); S.sel = todayS(); render(); });
 $('bBell').addEventListener('click', bellSheet);
