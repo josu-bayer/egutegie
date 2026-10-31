@@ -186,7 +186,8 @@ const T_REVIEW = {
   errepikapena: 'Errepikapena', errEz: 'Ez da errepikatzen', errEgunero: 'Egunero', errAstero: 'Astero', errHilero: 'Hilero', errUrtero: 'Urtero',
   errTartea: 'Tartea (zenbatero)', errArte: 'Arte (hautazkoa)', errEgunak: 'Asteko egunak',
   errOharra: 'Errepikatzen diren gertaerek ere izan dezakete abisua. Egunero goizeko mezuan agertzen dira.',
-  ezabauEgunHau: 'Egun hau bakarrik ezabau'
+  ezabauEgunHau: 'Egun hau bakarrik ezabau',
+  ezabauHurrengoak: 'Egun hau eta hurrengoak ezabau', ezabauSerie: 'Serie osoa ezabau (iraganekoak ere bai)'
 };
 // REVIEW END
 const T = Object.assign({}, T_OK, T_REVIEW);
@@ -735,8 +736,9 @@ function editEvent(id, date, occ) {
     <div class="btns">
       <button class="btn grow" data-act="evSave">${T.gorde}</button>
       <button class="btn ghost" data-act="close">${T.utzi}</button>
-      ${e ? `<button class="btn danger" data-act="evDel">${T.ezabau}</button>` : ''}
-      ${e && e.errepikapena && D.occ ? `<button class="btn ghost" data-act="evSkipOcc">${T.ezabauEgunHau} (${esc(D.occ.slice(5))})</button>` : ''}
+      ${e && e.errepikapena && D.occ ? `<button class="btn ghost" data-act="evSkipOcc">${T.ezabauEgunHau} (${esc(D.occ.slice(5))})</button>
+      <button class="btn danger" data-act="evEnd">${T.ezabauHurrengoak}</button>
+      <button class="btn danger" data-act="evDel">${T.ezabauSerie}</button>` : e ? `<button class="btn danger" data-act="evDel">${T.ezabau}</button>` : ''}
     </div>`);
 }
 async function saveEvent() {
@@ -776,6 +778,19 @@ async function skipOccurrence() {
     Object.assign(upd, { abisuaNoiz: nx ? nx.at : null, abisuaData: nx ? nx.date : null, bidalita: false });
   }
   const id = D.id; closeSheet(); await fsUpd(doc(db, 'gertaerak', id), upd);
+}
+// Stop the series from this occurrence on; earlier occurrences stay. If this is the first one, the whole event goes.
+async function endSeries() {
+  const e = D.prev, d = D.occ; if (!e || !e.errepikapena || !d) return;
+  if (!confirm(T.ziur)) return;
+  const id = D.id, last = addD(d, -1);
+  if (last < e.data) { closeSheet(); return fsDel(doc(db, 'gertaerak', id)); }
+  const upd = { errepikapena: Object.assign({}, e.errepikapena, { arte: last }) };
+  if (e.abisuMin != null) {
+    const nx = nextReminder(Object.assign({}, e, upd), Date.now());
+    Object.assign(upd, { abisuaNoiz: nx ? nx.at : null, abisuaData: nx ? nx.date : null, bidalita: false });
+  }
+  closeSheet(); await fsUpd(doc(db, 'gertaerak', id), upd);
 }
 // Mark one occurrence (the day pressed) as completed, or undo it. A completed day sends no reminder.
 async function toggleDone(id, date) {
@@ -1016,7 +1031,7 @@ const ACT = {
   close: closeSheet,
   jumpGo: jumpGo,
   jumpToday: () => { closeSheet(); S.cur = todayS(); S.sel = todayS(); render(); },
-  evSave: saveEvent, evDel: deleteEvent, evSkipOcc: skipOccurrence,
+  evSave: saveEvent, evDel: deleteEvent, evEnd: endSeries, evSkipOcc: skipOccurrence,
   cyc: async d => {
     const { cid, date } = D, k = d.a === 'mugitu' ? Number(val('cy-shift')) : 0;
     closeSheet(); await cycAct(cid, date, d.a, k);
