@@ -686,6 +686,7 @@ function editEvent(id, date, occ) {
   const e = id ? S.events.find(x => x.id === id) : null;
   D = { id: id || newId(C.ev), isNew: !e, prev: e || null, extras: e ? e.eremuak || {} : {}, occ: occ || null };
   D.leadTouched = false;
+  D.endTouched = !!(e && e.amaiera);              // until the end time is edited by hand it follows start + 30 min
   const v = e || { izenburua: '', data: date || S.sel, hasiera: '', amaiera: '', egunOsoa: false, oharrak: '', motaId: '', abisuMin: 30 };   // new events default to 30 min before
   const rp = (e && e.errepikapena) || {};
   openSheet(`
@@ -1040,6 +1041,10 @@ document.addEventListener('change', e => {
     if (D && D.isNew && !D.leadTouched) $('ev-lead').value = e.target.checked ? '120' : '30';   // default: 07:00 for all-day, 30 min before otherwise
   }
   if (e.target.id === 'ev-lead' && D) D.leadTouched = true;
+  if (e.target.id === 'ev-start' && D && !D.endTouched && e.target.value) {          // default length 30 min, clamped at the end of the day
+    const m = Math.min(mins(e.target.value) + 30, 1439); $('ev-end').value = pad(Math.floor(m / 60)) + ':' + pad(m % 60);
+  }
+  if (e.target.id === 'ev-end' && D) D.endTouched = true;
   if (e.target.id === 'ev-rep') {
     const m = e.target.value;
     $('ev-repbox').style.display = m ? '' : 'none'; $('ev-wdbox').style.display = m === 'astero' ? '' : 'none';
