@@ -155,6 +155,7 @@ const T_OK = {
 };
 // REVIEW START
 const T_REVIEW = {
+  joanDatara: 'Joan data batera', joan: 'Joan',
   dayInit: ['A', 'M', 'E', 'E', 'B', 'Z', 'D'],                          // initials of the confirmed day names
   vMonth: 'Hilabetea', vWeek: 'Astea', vDay: 'Eguna', vAgenda: 'Agenda',
   hutsik: 'Ezer ez', utzi: 'Utzi', itxi: 'Itxi',
@@ -642,7 +643,7 @@ function todaysReminders() {
 }
 function render() {
   const [a, b] = titleOf();
-  $('title').innerHTML = esc(a) + (b ? `<small>${esc(b)}</small>` : '');
+  $('title').innerHTML = esc(a) + (S.view === 'month' ? ' ▾' : '') + (b ? `<small>${esc(b)}</small>` : '');
   $('seg').innerHTML = VIEWS.map(([v, k]) => `<button class="${S.view === v ? 'on' : ''}" data-act="view" data-v="${v}">${T[k]}</button>`).join('');
   const [cls, txt] = syncText(); const p = $('pill'); p.className = cls; p.textContent = txt;
   const pending = todaysReminders().filter(e => !e.bidalita).length;
@@ -663,6 +664,22 @@ function openSheet(html) { $('sheet').innerHTML = html; $('sheetRoot').classList
 const reopen = fn => { if (!$('sheetRoot').classList.contains('open')) fn(); };
 function closeSheet() { $('sheetRoot').classList.remove('open'); $('sheet').innerHTML = ''; D = null; }
 const val = id => { const e = $(id); return e ? e.value : ''; };
+
+/* ---- jump to any date (month view, tap on the title) ---- */
+function jumpSheet() {
+  openSheet(`<h3>${T.joanDatara}</h3>
+    <label>${T.data}</label><input id="jump-date" type="date" value="${esc(S.cur)}" min="1900-01-01" max="2200-12-31">
+    <div class="btns">
+      <button class="btn grow" data-act="jumpGo">${T.joan}</button>
+      <button class="btn ghost" data-act="jumpToday">${T.gaur}</button>
+      <button class="btn ghost" data-act="close">${T.utzi}</button>
+    </div>`);
+}
+function jumpGo() {
+  const v = val('jump-date');
+  if (!/^\d{4}-\d\d-\d\d$/.test(v) || isNaN(new Date(v + 'T12:00:00')) || +v.slice(0, 4) < 1900 || +v.slice(0, 4) > 2200) return toast(T.errData || T.data);
+  closeSheet(); S.cur = v; S.sel = v; render();
+}
 
 /* ---- event editor ---- */
 function extrasHtml(typeId, values) {
@@ -997,6 +1014,8 @@ const ACT = {
   imp: d => showImported(d.id),
   ghost: d => ghostSheet(d.cid, d.d),
   close: closeSheet,
+  jumpGo: jumpGo,
+  jumpToday: () => { closeSheet(); S.cur = todayS(); S.sel = todayS(); render(); },
   evSave: saveEvent, evDel: deleteEvent, evSkipOcc: skipOccurrence,
   cyc: async d => {
     const { cid, date } = D, k = d.a === 'mugitu' ? Number(val('cy-shift')) : 0;
@@ -1107,7 +1126,10 @@ function nav(n) {
   document.addEventListener('contextmenu', e => { if (target(e)) e.preventDefault(); });
   document.addEventListener('click', e => { if (Date.now() < mute) { e.stopPropagation(); e.preventDefault(); mute = 0; } }, true);
 })();
-$('title').addEventListener('click', () => { S.cur = todayS(); S.sel = todayS(); render(); });
+$('title').addEventListener('click', () => {
+  if (S.view === 'month') return jumpSheet();
+  S.cur = todayS(); S.sel = todayS(); render();
+});
 $('bBell').addEventListener('click', bellSheet);
 $('bLayers').addEventListener('click', layersSheet);
 $('bSet').addEventListener('click', settingsSheet);
