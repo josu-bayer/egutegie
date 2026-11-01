@@ -155,7 +155,7 @@ const T_OK = {
 };
 // REVIEW START
 const T_REVIEW = {
-  joanDatara: 'Joan data batera', joan: 'Joan',
+  joanDatara: 'Joan data batera', joan: 'Joan', aparte: 'Aparte',
   dayInit: ['A', 'M', 'E', 'E', 'B', 'Z', 'D'],                          // initials of the confirmed day names
   vMonth: 'Hilabetea', vWeek: 'Astea', vDay: 'Eguna', vAgenda: 'Agenda',
   hutsik: 'Ezer ez', utzi: 'Utzi', itxi: 'Itxi',
@@ -449,12 +449,28 @@ async function loadSutelagun() {
     tok = j.nextPageToken || '';
   } while (tok);
   const days = dieta.zikloEgunak || [], n = days.length, out = {};
-  if (!n) return out;
   const slots = [['gosaria', '🍳', T.gosaria], ['bazkaria', '🍲', T.bazkaria], ['afaria', '🌙', T.afaria]];
   const today = todayS();
+  // Meals actually logged in Sutelagun (egunerokoa), last 7 days up to today, shown as done.
+  // A substitute or quick entry replaces that slot's plan for today.
+  const replaced = new Set();
+  for (let k = -7; k <= 0; k++) {
+    const date = addD(today, k);
+    const lr = await fetch(base + '/egunerokoa/' + date);
+    if (!lr.ok) continue;                                   // 404 = nothing logged that day
+    const log = fdoc(await lr.json());
+    (log.sarrerak || []).forEach(s => {
+      const si = slots.findIndex(x => x[0] === s.slota);
+      const [, icon, label] = si >= 0 ? slots[si] : [0, '🍽️', T.aparte];
+      (out[date] = out[date] || []).push({ title: s.izena || '?', icon, sub: label, done: true, order: 1500 + (si >= 0 ? si : 3) });
+      if (date === today && (s.jatorria === 'ordezkoa' || s.jatorria === 'azkarra')) replaced.add(s.slota);
+    });
+  }
+  if (!n) return out;
   for (let k = 0; k < 14; k++) {
     const date = addD(today, k);
     slots.forEach(([slot, icon, label], si) => {
+      if (k === 0 && replaced.has(slot)) return;
       let idx, biraka;
       const cur = dieta.aurrerapena && dieta.aurrerapena[slot];
       if (cur != null) {
