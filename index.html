@@ -33,6 +33,7 @@ label{display:block;font-size:.78rem;color:var(--muted);margin:12px 0 5px;font-w
 .ib{background:var(--panel);border:1px solid var(--line);border-radius:10px;min-width:38px;height:38px;font-size:1.05rem;display:inline-flex;align-items:center;justify-content:center;position:relative;padding:0 8px}
 .ib.on{border-color:var(--accent);color:var(--accent)}
 .ttl{font-weight:800;font-size:1.05rem;text-align:center;padding:6px 4px;background:none;border:none;width:100%}
+.leadrow{display:flex;gap:8px;margin-bottom:6px}.leadrow select{flex:1}
 .ttl small{display:block;font-weight:500;color:var(--muted);font-size:.7rem}
 .badge{position:absolute;top:-5px;right:-5px;background:var(--danger);color:#fff;border-radius:999px;font-size:.62rem;font-weight:800;min-width:17px;height:17px;display:none;align-items:center;justify-content:center;padding:0 4px}
 .seg{display:flex;margin-top:8px;border:1px solid var(--line);border-radius:11px;overflow:hidden}
@@ -163,7 +164,7 @@ const T_REVIEW = {
   egunOsoa: 'Egun osoa', hasiera: 'Hasiera', amaiera: 'Amaiera', oharrak: 'Oharrak',
   abisua: 'Abisua', abisurikEz: 'Abisurik ez',
   lead10: '10 minutu lehenago', lead30: '30 minutu lehenago', lead60: 'ordu 1 lehenago', lead120: '2 ordu lehenago',
-  lead1440: 'egun 1 lehenago', lead2880: '2 egun lehenago',
+  lead1440: 'egun 1 lehenago', lead2880: '2 egun lehenago', lead10080: 'aste 1 lehenago', abisuGehiago: '+ Abisu bat gehiago',
   abisuAzalpena: 'Abisuak telefonora iristen dira (Telegram), minutu bat edo bi berandu. Ez dira berehalakoak.',
   abisuEgunOsoa: 'Egun osoko gertaeretan abisua 09:00tik kontatzen da: "2 ordu lehenago" = 07:00etan.',
   izenburuaBeharra: 'Izenburua falta da', dataBeharra: 'Data falta da', izenaBeharra: 'Izena falta da',
@@ -262,18 +263,24 @@ function reminderAt(dateS, startS, allDay, leadMin) {
 }
 // Next reminder of event `e` strictly after epoch `from`, as { at, date } (date = the occurrence it belongs to), or null.
 // Repeating events skip completed (osatuak) and deleted (salbuetsiak) days. Mirrored by nextReminder_ in Code.gs.
+// An event can carry several alarms: `abisuak` is the list of lead minutes, `abisuMin` mirrors the smallest one
+// (so "has a reminder" checks and the old single-alarm script keep working). `abisuaNoiz` is the next pending alarm of all of them.
+const leadsOf = e => Array.isArray(e.abisuak) && e.abisuak.length ? e.abisuak : (e.abisuMin != null ? [e.abisuMin] : []);
 function nextReminder(e, from) {
-  if (e.abisuMin == null) return null;
-  if (!e.errepikapena) return { at: reminderAt(e.data, e.hasiera, e.egunOsoa, e.abisuMin), date: e.data };
-  const done = e.osatuak || [];
+  const leads = leadsOf(e); if (!leads.length) return null;
+  const pick = d => { let b = null; leads.forEach(l => { const at = reminderAt(d, e.hasiera, e.egunOsoa, l); if (at > from && (b == null || at < b)) b = at; }); return b; };
+  if (!e.errepikapena) { const at = pick(e.data); return at == null ? null : { at, date: e.data }; }
+  const done = e.osatuak || [], maxLead = Math.max(...leads);
   let d = addD(ds(new Date(from)), -1); if (d < e.data) d = e.data;
+  let best = null;
   for (let i = 0; i < 800; i++, d = addD(d, 1)) {
-    if (e.errepikapena.arte && d > e.errepikapena.arte) return null;
+    if (e.errepikapena.arte && d > e.errepikapena.arte) break;
+    if (best && reminderAt(d, '00:00', false, maxLead) > best.at) break;   // later days cannot have an earlier alarm
     if (!occurs(e, d) || done.includes(d)) continue;
-    const at = reminderAt(d, e.hasiera, e.egunOsoa, e.abisuMin);
-    if (at > from) return { at, date: d };
+    const at = pick(d);
+    if (at != null && (!best || at < best.at)) best = { at, date: d };
   }
-  return null;
+  return best;
 }
 
 /* ============================================================
@@ -543,8 +550,8 @@ function itemsFor(date) {
       order: e.egunOsoa ? -3 : (e.hasiera ? mins(e.hasiera) : 1439), rep: !!e.errepikapena, date,
       done: (e.osatuak || []).includes(date),
       // a repeating event keeps one pending reminder in abisuaNoiz (the next one), so earlier days count as sent
-      bell: e.errepikapena ? e.abisuMin != null && date >= todayS() : e.abisuaNoiz != null,
-      sent: e.errepikapena ? e.abisuaNoiz == null || reminderAt(date, e.hasiera, e.egunOsoa, e.abisuMin) < e.abisuaNoiz : !!e.bidalita
+      bell: e.errepikapena ? leadsOf(e).length > 0 && date >= todayS() : e.abisuaNoiz != null,
+      sent: e.errepikapena ? e.abisuaNoiz == null || reminderAt(date, e.hasiera, e.egunOsoa, Math.min(...leadsOf(e))) < e.abisuaNoiz : !!e.bidalita
     });
   });
   if (S.layers.cycles) S.cycles.forEach(c => {
@@ -649,12 +656,18 @@ function titleOf() {
 }
 function todaysReminders() {
   const t = todayS(), out = [];
+  // every alarm that falls on today, including "a week before" alarms of events on later days
   S.events.forEach(e => {
-    if ((e.osatuak || []).includes(t)) return;
-    if (!e.errepikapena) { if (e.data === t && e.abisuaNoiz != null) out.push(e); return; }
-    if (e.abisuMin == null || !occurs(e, t)) return;
-    const at = reminderAt(t, e.hasiera, e.egunOsoa, e.abisuMin);
-    out.push(Object.assign({}, e, { abisuaNoiz: at, bidalita: e.abisuaNoiz == null || at < e.abisuaNoiz }));
+    leadsOf(e).forEach(l => {
+      const lastDay = Math.ceil(l / 1440) + 1;
+      for (let k = 0; k <= lastDay; k++) {
+        const d = addD(t, k);
+        if (!occurs(e, d) || (e.osatuak || []).includes(d)) continue;
+        const at = reminderAt(d, e.hasiera, e.egunOsoa, l);
+        if (ds(new Date(at)) !== t) continue;
+        out.push(Object.assign({}, e, { abisuaNoiz: at, bidalita: e.errepikapena || leadsOf(e).length > 1 ? (e.abisuaNoiz == null || at < e.abisuaNoiz) : !!e.bidalita }));
+      }
+    });
   });
   return out.sort((a, b) => a.abisuaNoiz - b.abisuaNoiz);
 }
@@ -715,7 +728,11 @@ function readExtras() {
   });
   return o;
 }
-const LEADS = [[10, 'lead10'], [30, 'lead30'], [60, 'lead60'], [120, 'lead120'], [1440, 'lead1440'], [2880, 'lead2880']];
+const LEADS = [[10, 'lead10'], [30, 'lead30'], [60, 'lead60'], [120, 'lead120'], [1440, 'lead1440'], [2880, 'lead2880'], [10080, 'lead10080']];
+// One row of the alarm list. The first row keeps id ev-lead and the "no alarm" option, extra rows can be removed.
+function leadRow(sel, first) {
+  return `<div class="leadrow"><select ${first ? 'id="ev-lead"' : ''} class="ev-leadsel">${first ? `<option value="">${T.abisurikEz}</option>` : ''}${LEADS.map(([m, k]) => `<option value="${m}" ${sel === m ? 'selected' : ''}>${T[k]}</option>`).join('')}</select>${first ? '' : `<button type="button" class="btn ghost sm" data-act="delLead">✕</button>`}</div>`;
+}
 function editEvent(id, date, occ) {
   const e = id ? S.events.find(x => x.id === id) : null;
   D = { id: id || newId(C.ev), isNew: !e, prev: e || null, extras: e ? e.eremuak || {} : {}, occ: occ || null };
@@ -747,7 +764,8 @@ function editEvent(id, date, occ) {
       <p class="note">${T.errOharra}</p>
     </div>
     <label>${T.abisua}</label>
-    <select id="ev-lead"><option value="">${T.abisurikEz}</option>${LEADS.map(([m, k]) => `<option value="${m}" ${v.abisuMin === m ? 'selected' : ''}>${T[k]}</option>`).join('')}</select>
+    <div id="ev-leads">${(() => { const ls = [...leadsOf(v)].sort((a, b) => a - b); return leadRow(ls.length ? ls[0] : null, true) + ls.slice(1).map(l => leadRow(l, false)).join(''); })()}</div>
+    <button type="button" class="btn ghost sm" data-act="addLead">${T.abisuGehiago}</button>
     <p class="note warn">${T.abisuAzalpena}<br>${T.abisuEgunOsoa}</p>
     <div class="btns">
       <button class="btn grow" data-act="evSave">${T.gorde}</button>
@@ -769,16 +787,17 @@ async function saveEvent() {
     egunak: repMota === 'astero' ? [...document.querySelectorAll('.ev-wd:checked')].map(x => Number(x.value)) : [],
     arte: val('ev-until') || null, salbuetsiak: (D.prev && D.prev.errepikapena && D.prev.errepikapena.salbuetsiak) || []
   } : null;
-  const lead = val('ev-lead') === '' ? null : Number(val('ev-lead'));
+  const abisuak = [...new Set([...document.querySelectorAll('.ev-leadsel')].map(s => s.value).filter(v => v !== '').map(Number))].sort((a, b) => b - a);
+  const lead = abisuak.length ? Math.min(...abisuak) : null;
   const prev = D.prev;
   const amaieraData = endDate > date ? endDate : '';
   // completed days only count while the event still happens on them
   const osatuak = ((prev && prev.osatuak) || []).filter(d => occurs({ data: date, amaieraData, errepikapena }, d));
-  const nx = nextReminder({ data: date, hasiera: start, egunOsoa: allDay, abisuMin: lead, errepikapena, osatuak }, Date.now());
+  const nx = nextReminder({ data: date, hasiera: start, egunOsoa: allDay, abisuMin: lead, abisuak, errepikapena, osatuak }, Date.now());
   const noiz = nx ? nx.at : null;
   const data = {
     izenburua: title, data: date, amaieraData, hasiera: start, amaiera: end, egunOsoa: allDay, oharrak: val('ev-notes'),
-    motaId: val('ev-type'), eremuak: readExtras(), abisuMin: lead, abisuaNoiz: noiz, abisuaData: nx ? nx.date : null, errepikapena, osatuak,
+    motaId: val('ev-type'), eremuak: readExtras(), abisuMin: lead, abisuak, abisuaNoiz: noiz, abisuaData: nx ? nx.date : null, errepikapena, osatuak,
     bidalita: !!(prev && prev.bidalita && prev.abisuaNoiz === noiz), sortua: prev ? prev.sortua || Date.now() : Date.now()
   };
   const id = D.id; closeSheet();
@@ -1020,7 +1039,7 @@ function buildIcs() {
     }
     if (e.oharrak) L.push('DESCRIPTION:' + icsEsc(e.oharrak));
     if (t) L.push('CATEGORIES:' + icsEsc(t.izena));
-    if (e.abisuMin != null) L.push('BEGIN:VALARM', 'TRIGGER:-PT' + e.abisuMin + 'M', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEsc(e.izenburua), 'END:VALARM');
+    leadsOf(e).forEach(l => L.push('BEGIN:VALARM', 'TRIGGER:-PT' + l + 'M', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEsc(e.izenburua), 'END:VALARM'));
     L.push('END:VEVENT');
   });
   L.push('END:VCALENDAR');
@@ -1045,6 +1064,8 @@ const ACT = {
   imp: d => showImported(d.id),
   ghost: d => ghostSheet(d.cid, d.d),
   close: closeSheet,
+  addLead: () => { $('ev-leads').insertAdjacentHTML('beforeend', leadRow(30, false)); },
+  delLead: (d, el) => { const r = el.closest('.leadrow'); if (r) r.remove(); },
   jumpGo: jumpGo,
   jumpToday: () => { closeSheet(); S.cur = todayS(); S.sel = todayS(); render(); },
   evSave: saveEvent, evDel: deleteEvent, evEnd: endSeries, evSkipOcc: skipOccurrence,
@@ -1082,7 +1103,7 @@ const ACT = {
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el) return;
-  const f = ACT[el.dataset.act]; if (f) f(el.dataset);
+  const f = ACT[el.dataset.act]; if (f) f(el.dataset, el);
 });
 document.addEventListener('change', e => {
   if (e.target.id === 'ev-type') { D.extras = Object.assign(D.extras || {}, readExtras()); $('ev-extras').innerHTML = extrasHtml(e.target.value, D.extras); }
