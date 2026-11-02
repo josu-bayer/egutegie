@@ -52,6 +52,7 @@ main{padding:10px 12px 0}
 .lbl{font-size:.54rem;line-height:1.12;font-weight:600;text-align:left;overflow:hidden;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;padding:1px 2px;border-radius:3px;border-left:2.5px solid var(--c,#888);background:color-mix(in srgb,var(--c,#888) 22%,transparent);color:var(--ink)}
 .lbl.ghost{border-left-style:dashed;background:none;border-top:1px dashed color-mix(in srgb,var(--c,#888) 50%,transparent);border-bottom:1px dashed color-mix(in srgb,var(--c,#888) 50%,transparent);border-right:1px dashed color-mix(in srgb,var(--c,#888) 50%,transparent)}
 .lbl.imp{background:none;border:1px solid color-mix(in srgb,var(--c,#9aa) 60%,transparent);border-left:2.5px solid var(--c,#9aa)}
+.lbl.done{opacity:.55;text-decoration:line-through}
 .cell.other{opacity:.38}
 .cell.past{opacity:.5;filter:saturate(.45)}
 .cell.past.other{opacity:.28}
@@ -624,7 +625,7 @@ function viewMonth() {
     const named = items.filter(x => x.kind in rank).sort((a, b) => rank[a.kind] - rank[b.kind] || a.order - b.order);
     const linked = items.filter(x => !(x.kind in rank));
     const shown = named.slice(0, MONTH_LABELS), hidden = named.length - shown.length;
-    const lbls = shown.map(x => `<span class="lbl ${x.kind === 'own' ? '' : x.kind}" style="--c:${esc(x.color)}">${esc(x.title)}</span>`).join('');
+    const lbls = shown.map(x => `<span class="lbl ${x.kind === 'own' ? '' : x.kind}${x.done || x.state === 'egina' ? ' done' : ''}" style="--c:${esc(x.color)}">${x.done || x.state === 'egina' ? '✓ ' : ''}${esc(x.title)}</span>`).join('');
     const dots = linked.slice(0, 4).map(x => `<span class="dot ext" style="--c:${esc(x.color)}"></span>`).join('');
     h += `<button class="cell ${pd(d).getMonth() !== curM ? 'other' : ''} ${d === t ? 'today' : ''} ${d < t ? 'past' : ''} ${d === S.sel ? 'sel' : ''}" data-act="selday" data-d="${d}">` +
       `<span class="n">${pd(d).getDate()}</span><span class="lbls">${lbls}</span>` +
